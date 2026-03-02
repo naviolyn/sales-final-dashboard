@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 
 type SummaryCard = {
-  id: "total_sales" | "total_poi" | "total_collection";
+  id: "total_sales" | "total_poi" | "total_collection" | "ar_productive";
   title: string;
   value: number;
   unit?: "number" | "currency" | "percent";
@@ -21,8 +21,10 @@ type SummaryCard = {
 type SummaryResponse = {
   cards: SummaryCard[];
   lastSync: string;
-  months: string[]; // daftar bulan available (nama sheet)
-  selectedMonth?: string;
+
+  months: string[]; // available months (YYYY-MM)
+  selectedMonths?: string[]; // dari API summary (optional)
+  last3Months?: string[]; // optional
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -39,16 +41,22 @@ function formatValue(value: number, unit?: SummaryCard["unit"]) {
   return new Intl.NumberFormat("id-ID").format(value);
 }
 
+function formatPeriodLabel(months?: string[]) {
+  if (!months || months.length === 0) return "-";
+  if (months.length === 1) return months[0];
+  return `${months.length} bulan (${months.join(", ")})`;
+}
+
 export function SectionCards({
-  month,
+  months,
   witel,
 }: {
-  month?: string;
+  months?: string[];
   witel?: string;
 }) {
   const qs = new URLSearchParams();
-  if (month) qs.set("month", month);
-  if (witel && witel !== "ALL") qs.set("witel", witel); // bisa "ACEH" atau "ACEH,SUMUT"
+  if (months?.length) qs.set("months", months.join(","));
+  if (witel && witel !== "ALL") qs.set("witel", witel); // "Aceh" atau "Aceh,Sumut"
 
   const { data, isLoading, error } = useSWR<SummaryResponse>(
     `/api/summary?${qs.toString()}`,
@@ -59,20 +67,23 @@ export function SectionCards({
     }
   );
 
-  const resolvedMonth = React.useMemo(() => {
-    if (month) return month;
-    if (data?.selectedMonth) return data.selectedMonth;
+  const resolvedMonths = React.useMemo(() => {
+    // kalau props months ada, pakai itu
+    if (months?.length) return months;
+    // fallback kalau API mengirim selectedMonths
+    if (data?.selectedMonths?.length) return data.selectedMonths;
+    // fallback terakhir: ambil last available
     const ms = data?.months ?? [];
-    return ms.length ? ms[ms.length - 1] : "";
-  }, [month, data?.selectedMonth, data?.months]);
+    return ms.length ? [ms[ms.length - 1]] : [];
+  }, [months, data?.selectedMonths, data?.months]);
 
   const cards = React.useMemo(() => {
-    // pastikan urutan selalu: sales, poi, coll
     const map = new Map((data?.cards ?? []).map((c) => [c.id, c] as const));
     return [
       map.get("total_sales"),
       map.get("total_poi"),
       map.get("total_collection"),
+      map.get("ar_productive"),
     ].filter(Boolean) as SummaryCard[];
   }, [data?.cards]);
 
@@ -81,8 +92,8 @@ export function SectionCards({
   }
 
   return (
-    <div className="grid @xl/main:grid-cols-3 grid-cols-1 gap-4">
-      {(isLoading ? Array.from({ length: 3 }) : cards).map(
+    <div className="grid @5xl/main:grid-cols-4 @xl/main:grid-cols-2 grid-cols-1 gap-4">
+      {(isLoading ? Array.from({ length: 4 }) : cards).map(
         (c: any, idx: number) => {
           if (isLoading) {
             return (
@@ -104,9 +115,15 @@ export function SectionCards({
                 </CardTitle>
 
                 <div className="text-xs text-muted-foreground">
-                  Periode: {resolvedMonth || "-"}
+                  Periode: {formatPeriodLabel(resolvedMonths)}
                   {witel && witel !== "ALL" ? ` • Witel: ${witel}` : ""}
                 </div>
+
+                {c.subtitle ? (
+                  <div className="text-xs text-muted-foreground">
+                    {c.subtitle}
+                  </div>
+                ) : null}
               </CardHeader>
             </Card>
           );

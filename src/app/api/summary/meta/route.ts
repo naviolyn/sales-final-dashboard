@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { SHEETS_BY_MONTH } from "@/config/sheets";
-import { loadRowsByMonths } from "@/server/loadMergedRows";
+import {
+  getAvailableMonthKeys,
+  getCurrentJakartaMonthKey,
+  loadRowsByMonths,
+} from "@/server/loadMergedRows";
 
 function uniqSorted(arr: string[]) {
   return Array.from(new Set(arr.filter(Boolean))).sort((a, b) =>
@@ -9,18 +12,21 @@ function uniqSorted(arr: string[]) {
 }
 
 export async function GET() {
-  const months = Object.keys(SHEETS_BY_MONTH);
+  const months = await getAvailableMonthKeys();
 
-  // ambil witel dari bulan terakhir biar cepat & relevan
-  const lastMonth = months[months.length - 1] || "";
-  const rows = lastMonth ? await loadRowsByMonths([lastMonth]) : [];
+  const current = getCurrentJakartaMonthKey();
+  const defaultMonth = months.includes(current)
+    ? current
+    : months[months.length - 1] || "";
 
+  // ambil witel dari default month biar cepat & relevan
+  const rows = defaultMonth ? await loadRowsByMonths([defaultMonth]) : [];
   const witel = uniqSorted(rows.map((r) => r.witel));
 
   return NextResponse.json({
-    months,
-    witel,
-    defaultMonth: lastMonth,
+    months, // ["2025-11","2025-12","2026-01",...]
+    witel, // ["Aceh", "Aceh Barat", ...] (udah title case dari loader)
+    defaultMonth, // bulan sekarang kalau ada, else last
     lastSync: new Date().toISOString(),
   });
 }

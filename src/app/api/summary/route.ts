@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { loadRowsByMonths } from "@/server/loadMergedRows";
-import { SHEETS_BY_MONTH } from "@/config/sheets";
+import {
+  getAvailableMonthKeys,
+  getCurrentJakartaMonthKey,
+  loadRowsByMonths,
+} from "@/server/loadMergedRows";
 
 function sum(nums: number[]) {
   let t = 0;
@@ -8,42 +11,62 @@ function sum(nums: number[]) {
   return t;
 }
 
-function getAvailableMonths() {
-  // pakai urutan dari config (sesuai yang kamu define di SHEETS_BY_MONTH)
-  return Object.keys(SHEETS_BY_MONTH);
-}
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
-  // ✅ bulan = nama sheet: "November", "Desember", dst
-  const availableMonths = getAvailableMonths();
-  const monthParam = (searchParams.get("month") || "").trim();
+  const availableMonths = await getAvailableMonthKeys();
 
-  const month =
-    monthParam && availableMonths.includes(monthParam)
-      ? monthParam
-      : availableMonths[availableMonths.length - 1] || "";
+  // ===== months (multi) =====
+  const monthsParam = (searchParams.get("months") || "").trim();
+  const requestedMonths = monthsParam
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((m) => availableMonths.includes(m));
 
-  // ✅ witel multi: "ACEH,SUMUT" atau kosong => ALL
-  const witelParam = (searchParams.get("witel") || "").trim(); // bisa "ACEH" / "ACEH,SUMUT"
-  const selectedwitel = witelParam
+  // default: bulan saat ini (Asia/Jakarta) kalau ada, else bulan terakhir tersedia
+  const current = getCurrentJakartaMonthKey();
+  const defaultMonth = availableMonths.includes(current)
+    ? current
+    : availableMonths[availableMonths.length - 1] || "";
+
+  const selectedMonths = requestedMonths.length
+    ? requestedMonths
+    : defaultMonth
+    ? [defaultMonth]
+    : [];
+
+  // ===== witel (multi) =====
+  const witelParam = (searchParams.get("witel") || "").trim();
+  const selectedWitel = witelParam
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // load 1 bulan aja (default 1 bulan)
-  const rowsAll = month ? await loadRowsByMonths([month]) : [];
-
-  // filter witel kalau user pilih
-  const rows =
-    selectedwitel.length > 0
-      ? rowsAll.filter((r) => selectedwitel.includes(r.witel))
-      : rowsAll;
+  // ===== load rows untuk KPI totals (akumulasi selected months) =====
+  const rowsAll = selectedMonths.length
+    ? await loadRowsByMonths(selectedMonths)
+    : [];
+  const rows = selectedWitel.length
+    ? rowsAll.filter((r) => selectedWitel.includes(r.witel))
+    : rowsAll;
 
   const totalSales = sum(rows.map((r) => r.sales));
   const totalPOI = sum(rows.map((r) => r.poi));
   const totalColl = sum(rows.map((r) => r.coll));
+
+  // ✅ AR Produktif: sales > 3 pada periode terpilih (selectedMonths)
+  const byAR = new Map<string, { sales: number }>();
+  for (const r of rows) {
+    const key = r.kodeSales || `${r.namaAr}-${r.witel}-${r.telda}`;
+    const cur = byAR.get(key) ?? { sales: 0 };
+    cur.sales += r.sales;
+    byAR.set(key, cur);
+  }
+
+  const productiveARCount = Array.from(byAR.values()).filter(
+    (x) => x.sales > 3
+  ).length;
 
   const cards = [
     {
@@ -51,29 +74,40 @@ export async function GET(req: Request) {
       title: "Total Sales",
       value: totalSales,
       unit: "number",
-      subtitle: "Akumulasi semua AR (filter aktif)",
+      subtitle: `Akumulasi bulan: ${selectedMonths.join(", ")}`,
     },
     {
       id: "total_poi",
       title: "Total POI",
       value: totalPOI,
       unit: "number",
-      subtitle: "Total visiting pelanggan",
+      subtitle: `Akumulasi bulan: ${selectedMonths.join(", ")}`,
     },
     {
       id: "total_collection",
       title: "Total Collection",
       value: totalColl,
       unit: "number",
-      subtitle: "Total collection (angka)",
+      subtitle: `Akumulasi bulan: ${selectedMonths.join(", ")}`,
+    },
+    {
+      id: "ar_productive",
+      title: "AR Produktif",
+      value: productiveARCount,
+      unit: "number",
+      subtitle: `Sales > 3 pada periode: ${selectedMonths.join(", ")}`,
     },
   ];
 
   return NextResponse.json({
     cards,
     lastSync: new Date().toISOString(),
-    months: availableMonths, // buat dropdown bulan
-    selectedMonth: month, // optional tapi enak buat debug
+
+    // buat dropdown/filter
+    months: availableMonths,
+    selectedMonths,
+
     rowCount: rows.length,
+    arCount: byAR.size,
   });
 }

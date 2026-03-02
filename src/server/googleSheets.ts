@@ -26,3 +26,15 @@ export async function fetchSheetValues(params: {
 
   return res.data.values ?? [];
 }
+
+export async function fetchSpreadsheetMeta(params: { spreadsheetId: string }) {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: params.spreadsheetId,
+    fields: "sheets.properties.title",
+  });
+
+  return res.data;
+}

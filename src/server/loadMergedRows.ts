@@ -1,8 +1,7 @@
-import { SHEETS_BY_MONTH } from "@/config/sheets";
-import { fetchSheetValues } from "@/server/googleSheets";
+import { fetchSheetValues, fetchSpreadsheetMeta } from "@/server/googleSheets";
 
 export type ARRow = {
-  month: string;
+  month: string; // "YYYY-MM"
   witel: string;
   telda: string;
   kodeSales: string;
@@ -11,6 +10,42 @@ export type ARRow = {
   poi: number;
   coll: number;
 };
+
+const SPREADSHEET_ID = "1YCtYBlhWhLO28o-bV09o3osfwbW7k8_P6ACqO2xONgc";
+const DEFAULT_RANGE = "A1:H";
+
+const ID_MONTHS: Record<string, number> = {
+  januari: 1,
+  februari: 2,
+  maret: 3,
+  april: 4,
+  mei: 5,
+  juni: 6,
+  juli: 7,
+  agustus: 8,
+  september: 9,
+  oktober: 10,
+  november: 11,
+  desember: 12,
+};
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+/** "November 2025" -> "2025-11" */
+function parseTabToKey(title: string): string | null {
+  const m = title
+    .trim()
+    .toLowerCase()
+    .match(/^([a-z]+)\s+(\d{4})$/);
+  if (!m) return null;
+  const monthName = m[1];
+  const year = Number(m[2]);
+  const monthNum = ID_MONTHS[monthName];
+  if (!monthNum || !Number.isFinite(year)) return null;
+  return `${year}-${pad2(monthNum)}`;
+}
 
 function toNumber(v: unknown) {
   const s = String(v ?? "").trim();
@@ -40,23 +75,70 @@ function toTitleCase(str: string) {
     .join(" ");
 }
 
+// ===== cache meta tab => monthKey -> tabTitle
+type MonthTabMap = Record<string, string>; // {"2025-11":"November 2025", ...}
+let tabCache: { expiresAt: number; map: MonthTabMap; months: string[] } | null =
+  null;
+
+async function getTabMap(ttlSeconds = 300) {
+  if (tabCache && Date.now() < tabCache.expiresAt) return tabCache;
+
+  const meta = await fetchSpreadsheetMeta({ spreadsheetId: SPREADSHEET_ID });
+  const sheets = meta.sheets ?? [];
+
+  const map: MonthTabMap = {};
+  for (const s of sheets) {
+    const title = s.properties?.title ?? "";
+    const key = parseTabToKey(title);
+    if (!key) continue;
+    map[key] = title; // tabName asli
+  }
+
+  const months = Object.keys(map).sort((a, b) => a.localeCompare(b));
+
+  tabCache = {
+    expiresAt: Date.now() + ttlSeconds * 1000,
+    map,
+    months,
+  };
+  return tabCache;
+}
+
+/** helper default bulan sekarang (Asia/Jakarta) -> "YYYY-MM" */
+export function getCurrentJakartaMonthKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(date);
+
+  const y = parts.find((p) => p.type === "year")?.value ?? "1970";
+  const m = parts.find((p) => p.type === "month")?.value ?? "01";
+  return `${y}-${m}`;
+}
+
+/** buat meta dropdown: months available (YYYY-MM) */
+export async function getAvailableMonthKeys() {
+  const { months } = await getTabMap();
+  return months;
+}
+
+/** loader utama: ambil rows dari month keys (YYYY-MM) */
 export async function loadRowsByMonths(months: string[]): Promise<ARRow[]> {
-  const tasks = months.map(async (m) => {
-    const cfg = SHEETS_BY_MONTH[m];
-    if (!cfg) return [];
+  const { map } = await getTabMap();
 
-    // ✅ rangeA1 wajib ada
-    const rangeA1 = `${cfg.tabName}!${cfg.range ?? "A1:H"}`;
+  const tasks = months.map(async (monthKey) => {
+    const tabName = map[monthKey];
+    if (!tabName) return [];
 
-    // ✅ fetchSheetValues butuh { spreadsheetId, rangeA1 }
+    const rangeA1 = `${tabName}!${DEFAULT_RANGE}`;
     const values = await fetchSheetValues({
-      spreadsheetId: cfg.spreadsheetId,
+      spreadsheetId: SPREADSHEET_ID,
       rangeA1,
     });
 
     if (values.length < 2) return [];
 
-    // ✅ convert values[][] -> objects dengan header
     const headers = values[0].map(normHeader);
     const out: ARRow[] = [];
 
@@ -68,7 +150,7 @@ export async function loadRowsByMonths(months: string[]): Promise<ARRow[]> {
       }
 
       out.push({
-        month: m,
+        month: monthKey,
         witel: toTitleCase(getCell(obj, "WITEL")),
         telda: getCell(obj, "TELDA"),
         kodeSales: getCell(obj, "KODE_SALES"),
@@ -85,4 +167,3 @@ export async function loadRowsByMonths(months: string[]): Promise<ARRow[]> {
   const nested = await Promise.all(tasks);
   return nested.flat();
 }
-``;

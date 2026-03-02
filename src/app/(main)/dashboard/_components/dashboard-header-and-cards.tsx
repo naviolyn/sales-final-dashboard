@@ -5,85 +5,77 @@ import useSWR from "swr";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
 import { SectionCards } from "../default/_components/section-cards";
 
 type SummaryMetaResponse = {
-  months: string[]; // ["November","Desember",...]
-  witel: string[]; // ["ACEH","SUMUT",...]
+  months: string[];       // ["2025-11","2025-12","2026-01",...]
+  witel: string[];        // ["Aceh","Sumut",...]
+  defaultMonth?: string;  // optional dari meta endpoint
   lastSync?: string;
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-function labelWitel(selected: string[], all: string[]) {
-  if (selected.length === 0 || selected.length === all.length)
-    return "Semua Witel";
+function labelMulti(selected: string[], all: string[], allLabel: string) {
+  if (selected.length === 0 || selected.length === all.length) return allLabel;
   if (selected.length === 1) return selected[0];
-  return `${selected.length} witel dipilih`;
+  return `${selected.length} dipilih`;
 }
 
 export function DashboardHeaderAndCards() {
-  const { data, isLoading } = useSWR<SummaryMetaResponse>(
-    "/api/summary/meta",
-    fetcher
-  );
+  const { data, isLoading } = useSWR<SummaryMetaResponse>("/api/summary/meta", fetcher);
 
   const months = data?.months ?? [];
-  const witel = data?.witel ?? [];
+  const witels = data?.witel ?? [];
 
-  // default bulan: yang terakhir
-  const defaultMonth = months.length ? months[months.length - 1] : "";
-  const [month, setMonth] = React.useState<string>("");
-
+  // ===== default months: bulan saat ini (dari API) atau last =====
+  const defaultMonth = data?.defaultMonth || (months.length ? months[months.length - 1] : "");
+  const [selectedMonths, setSelectedMonths] = React.useState<string[]>([]);
   React.useEffect(() => {
-    if (!month && defaultMonth) setMonth(defaultMonth);
-  }, [defaultMonth, month]);
-
-  // default witel: semua
-  const [selectedWitel, setSelectedWitel] = React.useState<string[]>([]);
-
-  React.useEffect(() => {
-    if (witel.length && selectedWitel.length === 0) {
-      setSelectedWitel(witel);
+    if (months.length && selectedMonths.length === 0 && defaultMonth) {
+      setSelectedMonths([defaultMonth]); // default 1 bulan (bulan saat ini)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [witel.join("|")]);
+  }, [months.join("|"), defaultMonth]);
 
-  const toggleWitel = (w: string) => {
-    setSelectedWitel((prev) => {
-      const has = prev.includes(w);
-      const next = has ? prev.filter((x) => x !== w) : [...prev, w];
-      return next.length === 0 ? witel : next; // kalau kosong, balik ke semua
+  const toggleMonth = (m: string) => {
+    setSelectedMonths((prev) => {
+      const has = prev.includes(m);
+      const next = has ? prev.filter((x) => x !== m) : [...prev, m];
+      // kalau user kosongin semua, balik ke default 1 bulan
+      if (next.length === 0) return defaultMonth ? [defaultMonth] : prev;
+      // sort biar rapi
+      return next.slice().sort((a, b) => a.localeCompare(b));
     });
   };
 
-  const setAllWitel = () => setSelectedWitel(witel);
+  const setAllMonths = () => setSelectedMonths(months);
 
-  // ✅ string yang dipakai API summary
-  const witelParam =
-    selectedWitel.length === witel.length ? "ALL" : selectedWitel.join(",");
+  // ===== default witel: semua =====
+  const [selectedWitels, setSelectedWitels] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    if (witels.length && selectedWitels.length === 0) {
+      setSelectedWitels(witels);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [witels.join("|")]);
+
+  const toggleWitel = (w: string) => {
+    setSelectedWitels((prev) => {
+      const has = prev.includes(w);
+      const next = has ? prev.filter((x) => x !== w) : [...prev, w];
+      return next.length === 0 ? witels : next; // kalau kosong, balik ke semua
+    });
+  };
+
+  const setAllWitels = () => setSelectedWitels(witels);
+
+  // ✅ string yg dipakai API summary
+  const witelParam = selectedWitels.length === witels.length ? "ALL" : selectedWitels.join(",");
 
   return (
     <div className="space-y-4">
@@ -91,25 +83,53 @@ export function DashboardHeaderAndCards() {
         <h1 className="text-2xl font-semibold">Dashboard</h1>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-          {/* Filter Bulan (nama sheet) */}
-          <Select
-            value={month}
-            onValueChange={setMonth}
-            disabled={isLoading || months.length === 0}
-          >
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Pilih bulan" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* ===== Filter Bulan (multi) ===== */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between sm:w-[220px]"
+                disabled={isLoading || months.length === 0}
+              >
+                {labelMulti(selectedMonths, months, "Semua Bulan")}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
 
-          {/* Filter Witel (multi) */}
+            <PopoverContent className="w-[280px] p-0" align="end">
+              <Command>
+                <CommandInput placeholder="Cari bulan (YYYY-MM)..." />
+                <CommandList>
+                  <CommandEmpty>Bulan tidak ditemukan.</CommandEmpty>
+
+                  <CommandGroup>
+                    <CommandItem onSelect={setAllMonths} value="__all_months__">
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedMonths.length === months.length ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      Semua Bulan
+                    </CommandItem>
+
+                    {months.map((m) => {
+                      const checked = selectedMonths.includes(m);
+                      return (
+                        <CommandItem key={m} onSelect={() => toggleMonth(m)} value={m}>
+                          <Check className={cn("mr-2 h-4 w-4", checked ? "opacity-100" : "opacity-0")} />
+                          {m}
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          {/* ===== Filter Witel (multi) ===== */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -118,7 +138,7 @@ export function DashboardHeaderAndCards() {
                 className="w-full justify-between sm:w-[220px]"
                 disabled={isLoading}
               >
-                {labelWitel(selectedWitel, witel)}
+                {labelMulti(selectedWitels, witels, "Semua Witel")}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -130,32 +150,21 @@ export function DashboardHeaderAndCards() {
                   <CommandEmpty>Witel tidak ditemukan.</CommandEmpty>
 
                   <CommandGroup>
-                    <CommandItem onSelect={setAllWitel} value="__all__">
+                    <CommandItem onSelect={setAllWitels} value="__all_witels__">
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          selectedWitel.length === witel.length
-                            ? "opacity-100"
-                            : "opacity-0"
+                          selectedWitels.length === witels.length ? "opacity-100" : "opacity-0"
                         )}
                       />
                       Semua Witel
                     </CommandItem>
 
-                    {witel.map((w) => {
-                      const checked = selectedWitel.includes(w);
+                    {witels.map((w) => {
+                      const checked = selectedWitels.includes(w);
                       return (
-                        <CommandItem
-                          key={w}
-                          onSelect={() => toggleWitel(w)}
-                          value={w}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              checked ? "opacity-100" : "opacity-0"
-                            )}
-                          />
+                        <CommandItem key={w} onSelect={() => toggleWitel(w)} value={w}>
+                          <Check className={cn("mr-2 h-4 w-4", checked ? "opacity-100" : "opacity-0")} />
                           {w}
                         </CommandItem>
                       );
@@ -169,7 +178,7 @@ export function DashboardHeaderAndCards() {
       </div>
 
       {/* ✅ KPI cards */}
-      <SectionCards month={month} witel={witelParam} />
+      <SectionCards months={selectedMonths} witel={witelParam} />
     </div>
   );
 }
