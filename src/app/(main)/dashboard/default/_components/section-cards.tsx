@@ -2,9 +2,12 @@
 
 import useSWR from "swr";
 import * as React from "react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
+  CardAction,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -15,16 +18,13 @@ type SummaryCard = {
   title: string;
   value: number;
   unit?: "number" | "currency" | "percent";
+  deltaPct?: number | null;
   subtitle?: string;
 };
 
 type SummaryResponse = {
   cards: SummaryCard[];
   lastSync: string;
-
-  months: string[]; // available months (YYYY-MM)
-  selectedMonths?: string[]; // dari API summary (optional)
-  last3Months?: string[]; // optional
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -41,22 +41,19 @@ function formatValue(value: number, unit?: SummaryCard["unit"]) {
   return new Intl.NumberFormat("id-ID").format(value);
 }
 
-function formatPeriodLabel(months?: string[]) {
-  if (!months || months.length === 0) return "-";
-  if (months.length === 1) return months[0];
-  return `${months.length} bulan (${months.join(", ")})`;
-}
-
 export function SectionCards({
-  months,
+  start,
+  end,
   witel,
 }: {
-  months?: string[];
+  start?: string;
+  end?: string;
   witel?: string;
 }) {
   const qs = new URLSearchParams();
-  if (months?.length) qs.set("months", months.join(","));
-  if (witel && witel !== "ALL") qs.set("witel", witel); // "Aceh" atau "Aceh,Sumut"
+  if (start) qs.set("start", start);
+  if (end) qs.set("end", end);
+  if (witel && witel !== "ALL") qs.set("witel", witel);
 
   const { data, isLoading, error } = useSWR<SummaryResponse>(
     `/api/summary?${qs.toString()}`,
@@ -67,29 +64,10 @@ export function SectionCards({
     }
   );
 
-  const resolvedMonths = React.useMemo(() => {
-    // kalau props months ada, pakai itu
-    if (months?.length) return months;
-    // fallback kalau API mengirim selectedMonths
-    if (data?.selectedMonths?.length) return data.selectedMonths;
-    // fallback terakhir: ambil last available
-    const ms = data?.months ?? [];
-    return ms.length ? [ms[ms.length - 1]] : [];
-  }, [months, data?.selectedMonths, data?.months]);
+  const cards = data?.cards ?? [];
 
-  const cards = React.useMemo(() => {
-    const map = new Map((data?.cards ?? []).map((c) => [c.id, c] as const));
-    return [
-      map.get("total_sales"),
-      map.get("total_poi"),
-      map.get("total_collection"),
-      map.get("ar_productive"),
-    ].filter(Boolean) as SummaryCard[];
-  }, [data?.cards]);
-
-  if (error) {
+  if (error)
     return <div className="text-sm text-destructive">Gagal load summary.</div>;
-  }
 
   return (
     <div className="grid @5xl/main:grid-cols-4 @xl/main:grid-cols-2 grid-cols-1 gap-4">
@@ -106,18 +84,26 @@ export function SectionCards({
             );
           }
 
+          const d = c.deltaPct;
+          const showDelta = typeof d === "number" && Number.isFinite(d);
+          const isUp = showDelta ? d >= 0 : true;
+          const TrendIcon = isUp ? TrendingUp : TrendingDown;
+
           return (
             <Card key={c.id} className="@container/card">
               <CardHeader>
                 <CardDescription>{c.title}</CardDescription>
+
                 <CardTitle className="font-semibold @[250px]/card:text-3xl text-2xl tabular-nums">
                   {formatValue(c.value, c.unit)}
                 </CardTitle>
 
-                <div className="text-xs text-muted-foreground">
-                  Periode: {formatPeriodLabel(resolvedMonths)}
-                  {witel && witel !== "ALL" ? ` • Witel: ${witel}` : ""}
-                </div>
+                <CardAction>
+                  <Badge variant="outline">
+                    {showDelta ? <TrendIcon className="mr-1 size-4" /> : null}
+                    {showDelta ? `${isUp ? "+" : ""}${d.toFixed(1)}%` : "—"}
+                  </Badge>
+                </CardAction>
 
                 {c.subtitle ? (
                   <div className="text-xs text-muted-foreground">

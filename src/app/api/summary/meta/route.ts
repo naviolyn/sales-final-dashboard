@@ -13,20 +13,19 @@ function uniqSorted(arr: string[]) {
 
 export async function GET() {
   const months = await getAvailableMonthKeys();
-
   const current = getCurrentJakartaMonthKey();
   const defaultMonth = months.includes(current)
     ? current
     : months[months.length - 1] || "";
 
-  // ambil witel dari default month biar cepat & relevan
   const rows = defaultMonth ? await loadRowsByMonths([defaultMonth]) : [];
   const witel = uniqSorted(rows.map((r) => r.witel));
 
   return NextResponse.json({
-    months, // ["2025-11","2025-12","2026-01",...]
-    witel, // ["Aceh", "Aceh Barat", ...] (udah title case dari loader)
-    defaultMonth, // bulan sekarang kalau ada, else last
+    months,
+    witel,
+    defaultStart: defaultMonth,
+    defaultEnd: defaultMonth,
     lastSync: new Date().toISOString(),
   });
 }
