@@ -103,7 +103,8 @@ export default function TopARWideCard() {
               accessibilityLayer
               data={chartData}
               layout="vertical"
-              barSize={32}
+                barSize={36}
+                
             >
               <CartesianGrid horizontal={false} />
               <YAxis
@@ -145,13 +146,13 @@ export default function TopARWideCard() {
                   dataKey="name"
                   position="insideLeft"
                   offset={8}
-                  className="fill-primary-foreground text-xs"
+                  className="fill-primary-foreground text-base"
                 />
                 <LabelList
                   dataKey="sales"
                   position="insideRight"
                   offset={8}
-                  className="fill-primary-foreground text-xs tabular-nums"
+                  className="fill-primary-foreground text-base tabular-nums"
                   formatter={(v: any) => fmtNumber(Number(v))}
                 />
               </Bar>
