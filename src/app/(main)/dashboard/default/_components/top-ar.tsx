@@ -3,7 +3,7 @@
 import * as React from "react";
 import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -21,6 +21,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+// import { topArChartConfig } from "./config-ar";
+
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   const json = await res.json();
@@ -31,8 +33,7 @@ const fetcher = async (url: string) => {
 const topArChartConfig = {
   sales: {
     label: "Sales",
-    // Shadcn chart biasanya pakai hsl(var(--chart-1)), sesuaikan kalau kamu punya token lain
-    color: "hsl(var(--chart-1))",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
 
@@ -40,18 +41,36 @@ function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-export default function TopARCard() {
-  const sp = useSearchParams();
-  const month = sp.get("month") || ""; // dari filter dashboard kamu
-  const witel = sp.get("witel") || "ALL"; // dari filter dashboard kamu
+function fmtPeriode(data: any) {
+  // API kamu return "months" (array). Tapi biar backward-compatible, cek juga "month"
+  if (Array.isArray(data?.months) && data.months.length) return data.months.join(" - ");
+  if (typeof data?.month === "string" && data.month) return data.month;
+  return "-";
+}
 
-  const qs = new URLSearchParams();
-  if (month) qs.set("month", month);
-  if (witel) qs.set("witel", witel);
-  qs.set("topN", "10");
+export default function TopARWideCard() {
+  const sp = useSearchParams();
+
+  const start = sp.get("start") || "";
+  const end = sp.get("end") || "";
+  const month = sp.get("month") || "";
+  const witel = sp.get("witel") || "ALL";
+
+  const qs = React.useMemo(() => {
+    const p = new URLSearchParams();
+    if (start && end) {
+      p.set("start", start);
+      p.set("end", end);
+    } else if (month) {
+      p.set("month", month);
+    }
+    p.set("witel", witel);
+    p.set("topN", "10");
+    return p.toString();
+  }, [start, end, month, witel]);
 
   const { data, isLoading, error } = useSWR(
-    `/api/dashboard/top-ar?${qs.toString()}`,
+    `/api/dashboard/top-ar?${qs}`,
     fetcher,
     { refreshInterval: 60_000, revalidateOnFocus: true }
   );
@@ -59,55 +78,55 @@ export default function TopARCard() {
   const chartData =
     (data?.items ?? []).map((x: any) => ({
       name: x.namaAr,
-      sales: x.sales,
+      sales: Number(x.sales ?? 0),
       witel: x.witel,
     })) ?? [];
 
   return (
-    <Card className="@container/card">
-      <CardHeader className="pb-2">
+    <Card className="col-span-1 xl:col-span-3">
+      <CardHeader>
         <CardTitle>Top 10 AR by Sales</CardTitle>
         <CardDescription>
-          {data?.month ? `Periode: ${data.month}` : "Periode: -"}{" "}
+          Periode: {fmtPeriode(data)}{" "}
           {data?.witel ? `• Witel: ${data.witel}` : ""}
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="pt-2">
+      <CardContent className="size-full">
         {error ? (
           <div className="text-sm text-destructive">
             Gagal load data Top AR.
           </div>
         ) : (
-          <ChartContainer
-            className="h-[280px] w-full"
-            config={topArChartConfig}
-          >
+          <ChartContainer config={topArChartConfig} className="size-full">
             <BarChart
               accessibilityLayer
               data={chartData}
               layout="vertical"
-              barSize={10}
-              margin={{ top: 8, right: 12, bottom: 8, left: 80 }}
+              barSize={32}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tickLine={false} axisLine={false} />
+              <CartesianGrid horizontal={false} />
               <YAxis
-                type="category"
                 dataKey="name"
+                type="category"
                 tickLine={false}
+                tickMargin={10}
                 axisLine={false}
-                width={140}
+                tickFormatter={(value) => value.slice(0, 3)}
+                hide
               />
+              <XAxis type="number" hide />
 
               <ChartTooltip
+                cursor={false}
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(label) => `AR: ${label}`}
-                    formatter={(value, name, item) => {
+                    labelFormatter={(label) => `${label}`}
+                    formatter={(value, _name, item) => {
                       const payload: any = item?.payload;
                       return [
                         fmtNumber(Number(value)),
+                        " ",
                         `Sales • ${payload?.witel ?? ""}`,
                       ];
                     }}
@@ -115,30 +134,39 @@ export default function TopARCard() {
                 }
               />
 
+              {/* NO STACKED: cuma 1 Bar */}
               <Bar
                 dataKey="sales"
-                fill="var(--color-sales)" // dari config key "sales"
-                radius={[4, 4, 4, 4]}
-                background={{
-                  fill: "var(--color-background)",
-                  radius: 4,
-                  opacity: 0.07,
-                }}
-              />
+                layout="vertical"
+                fill="var(--color-sales)"
+                radius={[6, 6, 6, 6]}
+              >
+                <LabelList
+                  dataKey="name"
+                  position="insideLeft"
+                  offset={8}
+                  className="fill-primary-foreground text-xs"
+                />
+                <LabelList
+                  dataKey="sales"
+                  position="insideRight"
+                  offset={8}
+                  className="fill-primary-foreground text-xs tabular-nums"
+                  formatter={(v: any) => fmtNumber(Number(v))}
+                />
+              </Bar>
             </BarChart>
           </ChartContainer>
         )}
       </CardContent>
 
-      <CardFooter className="flex items-center justify-between">
-        <span className="font-semibold text-base tabular-nums">
-          {isLoading ? "..." : `Total: ${fmtNumber(data?.totalSales ?? 0)}`}
-        </span>
-        <span className="text-xs text-muted-foreground">
+      <CardFooter>
+        <p className="text-muted-foreground text-xs">
+          {isLoading ? "Loading..." : `Total item: ${chartData.length}`}
           {data?.lastSync
-            ? `Sync: ${new Date(data.lastSync).toLocaleString("id-ID")}`
+            ? ` · Sync: ${new Date(data.lastSync).toLocaleString("id-ID")}`
             : ""}
-        </span>
+        </p>
       </CardFooter>
     </Card>
   );
