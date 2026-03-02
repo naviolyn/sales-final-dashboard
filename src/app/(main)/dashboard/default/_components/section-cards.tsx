@@ -29,6 +29,27 @@ type SummaryResponse = {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+function formatMonthLabel(key?: string) {
+  if (!key) return "-";
+
+  const [year, month] = key.split("-").map(Number);
+  if (!year || !month) return key;
+
+  const date = new Date(year, month - 1, 1);
+
+  return date.toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatRangeLabel(start?: string, end?: string) {
+  if (!start) return "-";
+  if (!end || start === end) return formatMonthLabel(start);
+
+  return `${formatMonthLabel(start)} – ${formatMonthLabel(end)}`;
+}
+
 function formatValue(value: number, unit?: SummaryCard["unit"]) {
   if (unit === "currency") {
     return new Intl.NumberFormat("id-ID", {
@@ -99,17 +120,33 @@ export function SectionCards({
                 </CardTitle>
 
                 <CardAction>
-                  <Badge variant="outline">
+                  <Badge
+                    variant="outline"
+                    className={
+                      !showDelta
+                        ? "text-muted-foreground border-muted"
+                        : d === 0
+                        ? "text-muted-foreground border-muted"
+                        : isUp
+                        ? `
+            text-emerald-600 border-emerald-300 bg-emerald-50
+            dark:text-emerald-400 dark:border-emerald-500/40 dark:bg-emerald-500/10
+          `
+                        : `
+            text-rose-600 border-rose-300 bg-rose-50
+            dark:text-rose-400 dark:border-rose-500/40 dark:bg-rose-500/10
+          `
+                    }
+                  >
                     {showDelta ? <TrendIcon className="mr-1 size-4" /> : null}
                     {showDelta ? `${isUp ? "+" : ""}${d.toFixed(1)}%` : "—"}
                   </Badge>
                 </CardAction>
 
-                {c.subtitle ? (
-                  <div className="text-xs text-muted-foreground">
-                    {c.subtitle}
-                  </div>
-                ) : null}
+                <div className="text-xs text-muted-foreground">
+                  Periode: {formatRangeLabel(start, end)}
+                  {witel && witel !== "ALL" ? ` • Witel: ${witel}` : ""}
+                </div>
               </CardHeader>
             </Card>
           );

@@ -37,7 +37,19 @@ type SummaryMetaResponse = {
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+function formatMonthLabel(key?: string) {
+  if (!key) return "-";
 
+  const [year, month] = key.split("-").map(Number);
+  if (!year || !month) return key;
+
+  const date = new Date(year, month - 1, 1);
+
+  return date.toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
+}
 function labelWitel(selected: string[], all: string[]) {
   if (selected.length === 0 || selected.length === all.length)
     return "Semua Witel";
@@ -99,34 +111,46 @@ export function DashboardHeaderAndCards() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
 
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* START MONTH */}
-          <Select value={start} onValueChange={setStart}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Start month" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-end sm:justify-end">
+          {/* FILTER PERIODE */}
+          <div className="flex items-end gap-2">
+            {/* Bulan Awal */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Bulan Awal</span>
+              <Select value={start} onValueChange={setStart}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Pilih bulan awal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {formatMonthLabel(m)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* END MONTH */}
-          <Select value={end} onValueChange={setEnd}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="End month" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Separator */}
+            <div className="pb-2 text-sm text-muted-foreground">s.d.</div>
+
+            {/* Bulan Akhir */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Bulan Akhir</span>
+              <Select value={end} onValueChange={setEnd}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Pilih bulan akhir" />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {formatMonthLabel(m)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* WITEL MULTI */}
           <Popover>
