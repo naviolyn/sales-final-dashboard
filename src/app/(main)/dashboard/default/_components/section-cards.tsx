@@ -143,10 +143,10 @@ export function SectionCards({
                   </Badge>
                 </CardAction>
 
-                <div className="text-xs text-muted-foreground">
+                {/* <div className="text-xs text-muted-foreground">
                   Periode: {formatRangeLabel(start, end)}
                   {witel && witel !== "ALL" ? ` • Witel: ${witel}` : ""}
-                </div>
+                </div> */}
               </CardHeader>
             </Card>
           );

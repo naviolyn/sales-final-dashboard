@@ -1,4 +1,3 @@
-// src/server/googleSheets.ts
 import { google } from "googleapis";
 
 function getAuth() {
@@ -14,8 +13,10 @@ function getAuth() {
 
 export async function fetchSheetValues(params: {
   spreadsheetId: string;
-  rangeA1: string; // contoh: "DATA!A1:Z"
+  rangeA1: string;
 }) {
+  if (!params.rangeA1?.trim()) throw new Error("Missing rangeA1");
+
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -27,13 +28,15 @@ export async function fetchSheetValues(params: {
   return res.data.values ?? [];
 }
 
+// ✅ TAMBAHKAN INI
 export async function fetchSpreadsheetMeta(params: { spreadsheetId: string }) {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
 
+  // ambil title tab + sheetId (cukup untuk mapping bulan)
   const res = await sheets.spreadsheets.get({
     spreadsheetId: params.spreadsheetId,
-    fields: "sheets.properties.title",
+    fields: "sheets(properties(sheetId,title))",
   });
 
   return res.data;

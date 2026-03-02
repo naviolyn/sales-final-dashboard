@@ -35,10 +35,7 @@ function pad2(n: number) {
 
 /** "November 2025" -> "2025-11" */
 function parseTabToKey(title: string): string | null {
-  const m = title
-    .trim()
-    .toLowerCase()
-    .match(/^([a-z]+)\s+(\d{4})$/);
+  const m = title.trim().toLowerCase().match(/^([a-z]+)\s+(\d{4})$/);
   if (!m) return null;
   const monthName = m[1];
   const year = Number(m[2]);
@@ -77,8 +74,7 @@ function toTitleCase(str: string) {
 
 // ===== cache meta tab => monthKey -> tabTitle
 type MonthTabMap = Record<string, string>; // {"2025-11":"November 2025", ...}
-let tabCache: { expiresAt: number; map: MonthTabMap; months: string[] } | null =
-  null;
+let tabCache: { expiresAt: number; map: MonthTabMap; months: string[] } | null = null;
 
 async function getTabMap(ttlSeconds = 300) {
   if (tabCache && Date.now() < tabCache.expiresAt) return tabCache;
