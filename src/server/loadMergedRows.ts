@@ -31,6 +31,15 @@ function getCell(obj: Record<string, string>, key: string) {
   return (obj[key] ?? "").trim();
 }
 
+function toTitleCase(str: string) {
+  return str
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export async function loadRowsByMonths(months: string[]): Promise<ARRow[]> {
   const tasks = months.map(async (m) => {
     const cfg = SHEETS_BY_MONTH[m];
@@ -60,7 +69,7 @@ export async function loadRowsByMonths(months: string[]): Promise<ARRow[]> {
 
       out.push({
         month: m,
-        witel: getCell(obj, "WITEL"),
+        witel: toTitleCase(getCell(obj, "WITEL")),
         telda: getCell(obj, "TELDA"),
         kodeSales: getCell(obj, "KODE_SALES"),
         namaAr: getCell(obj, "NAMA_AR"),

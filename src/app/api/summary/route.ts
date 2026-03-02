@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadRowsByMonths } from "@/server/loadMergedRows";
+import { SHEETS_BY_MONTH } from "@/config/sheets";
 
 function sum(nums: number[]) {
   let t = 0;
@@ -7,75 +8,72 @@ function sum(nums: number[]) {
   return t;
 }
 
+function getAvailableMonths() {
+  // pakai urutan dari config (sesuai yang kamu define di SHEETS_BY_MONTH)
+  return Object.keys(SHEETS_BY_MONTH);
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const monthsParam = searchParams.get("months") || "";
-  const months = monthsParam
+
+  // ✅ bulan = nama sheet: "November", "Desember", dst
+  const availableMonths = getAvailableMonths();
+  const monthParam = (searchParams.get("month") || "").trim();
+
+  const month =
+    monthParam && availableMonths.includes(monthParam)
+      ? monthParam
+      : availableMonths[availableMonths.length - 1] || "";
+
+  // ✅ witel multi: "ACEH,SUMUT" atau kosong => ALL
+  const witelParam = (searchParams.get("witel") || "").trim(); // bisa "ACEH" / "ACEH,SUMUT"
+  const selectedwitel = witelParam
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // fallback kalau kosong
-  const selectedMonths = months.length ? months : ["2026-01", "2026-02", "2026-03"];
+  // load 1 bulan aja (default 1 bulan)
+  const rowsAll = month ? await loadRowsByMonths([month]) : [];
 
-  const rows = await loadRowsByMonths(selectedMonths);
+  // filter witel kalau user pilih
+  const rows =
+    selectedwitel.length > 0
+      ? rowsAll.filter((r) => selectedwitel.includes(r.witel))
+      : rowsAll;
 
   const totalSales = sum(rows.map((r) => r.sales));
   const totalPOI = sum(rows.map((r) => r.poi));
   const totalColl = sum(rows.map((r) => r.coll));
 
-  // agregasi per AR across months: key = kodeSales
-  const byAR = new Map<string, { sales: number }>();
-  for (const r of rows) {
-    const key = r.kodeSales || `${r.namaAr}-${r.witel}-${r.telda}`;
-    const cur = byAR.get(key) ?? { sales: 0 };
-    cur.sales += r.sales;
-    byAR.set(key, cur);
-  }
-
-  const nonProdCount = Array.from(byAR.values()).filter((x) => x.sales >= 0 && x.sales <= 3).length;
-
   const cards = [
     {
-      id: "sales",
-      title: "Total Sales (3 bulan)",
+      id: "total_sales",
+      title: "Total Sales",
       value: totalSales,
       unit: "number",
-      // deltaPct nanti dihitung beneran kalau kamu juga load 3 bulan sebelumnya
-      deltaPct: 0,
       subtitle: "Akumulasi semua AR (filter aktif)",
     },
     {
-      id: "poi",
+      id: "total_poi",
       title: "Total POI",
       value: totalPOI,
       unit: "number",
-      deltaPct: 0,
       subtitle: "Total visiting pelanggan",
     },
     {
-      id: "coll",
+      id: "total_collection",
       title: "Total Collection",
       value: totalColl,
-      unit: "currency",
-      deltaPct: 0,
-      subtitle: "Total collection (IDR)",
-    },
-    {
-      id: "prod",
-      title: "AR Non-produktif",
-      value: nonProdCount,
       unit: "number",
-      deltaPct: 0,
-      subtitle: "Sales 0–3 (total 3 bulan)",
+      subtitle: "Total collection (angka)",
     },
   ];
 
   return NextResponse.json({
     cards,
     lastSync: new Date().toISOString(),
-    months: selectedMonths,
+    months: availableMonths, // buat dropdown bulan
+    selectedMonth: month, // optional tapi enak buat debug
     rowCount: rows.length,
-    arCount: byAR.size,
   });
 }
