@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 import { SectionCards } from "../default/_components/section-cards";
 import TopARWideCard from "../default/_components/top-ar";
+import BestWitelPieCard from "../default/_components/best-witel-pie-chart";
 
 type SummaryMetaResponse = {
   months: string[]; // ["2025-11","2025-12",...]
@@ -208,9 +209,18 @@ export function DashboardHeaderAndCards() {
 
       {/* KPI Cards */}
       <SectionCards start={start} end={end} witel={witelParam} />
-      <div className="flex fles-row">
+      <div className="flex fles-row w-full gap-4 ">
         <div className="xl:w-3/5">
           <TopARWideCard start={start} end={end} witel={witelParam} />
+        </div>
+        <div className="xl:w-2/5">
+            <BestWitelPieCard
+              start={start}
+              end={end}
+              witel={witelParam}
+              topN={6}
+            />
+            {/* kamu bisa taruh TopARWideCard di sampingnya juga */}
         </div>
       </div>
     </div>
