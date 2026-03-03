@@ -1,17 +1,31 @@
-import { InsightCards } from "./_components/insight-cards";
-import { OperationalCards } from "./_components/operational-cards";
-import { OverviewCards } from "./_components/overview-cards";
-import { TableCards } from "./_components/table-cards";
-import { TabsTop } from "./_components/tabs-top";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GlobalFilters } from "./_components/global-filters";
+import { MetricAnalytics } from "./_components/metric-analytics";
 
-export default function Page() {
+export default function CRMPage() {
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <TabsTop />
-      <OverviewCards />
-      <InsightCards />
-      <OperationalCards />
-      <TableCards />
+    <div className="flex flex-col gap-6">
+      <GlobalFilters />
+
+      <Tabs defaultValue="sales" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="poi">POI</TabsTrigger>
+          <TabsTrigger value="collection">Collection</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="sales" className="mt-6">
+          <MetricAnalytics metric="sales" />
+        </TabsContent>
+
+        <TabsContent value="poi" className="mt-6">
+          <MetricAnalytics metric="poi" />
+        </TabsContent>
+
+        <TabsContent value="collection" className="mt-6">
+          <MetricAnalytics metric="coll" />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
