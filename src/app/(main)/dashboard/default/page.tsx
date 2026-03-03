@@ -8,7 +8,7 @@ import { DashboardHeaderAndCards } from "../_components/dashboard-header-and-car
 
 export default function Page() {
   return (
-    <div className="@container/main flex flex-col gap-4 md:gap-6">
+    <div className="@container/main flex flex-col gap-4 md:gap-4">
       <DashboardHeaderAndCards />
       <ChartSalesByWitel />
       <div className="flex flex-row max-lg:flex-col gap-4 md:gap-6 ">

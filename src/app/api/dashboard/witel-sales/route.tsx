@@ -7,10 +7,11 @@ import {
 } from "@/server/loadMergedRows";
 
 const QuerySchema = z.object({
+  range: z.enum(["3m", "6m", "1y"]).optional(),
   start: z.string().optional(),
   end: z.string().optional(),
-  witel: z.string().optional(), // "ALL" atau "Aceh,Sumut"
-  topN: z.coerce.number().min(1).max(20).optional(), // pie enaknya max 10-12
+  witel: z.string().optional(),
+  topN: z.coerce.number().min(1).max(20).optional(),
 });
 
 function pickMonthsInRange(available: string[], start: string, end: string) {
@@ -30,9 +31,11 @@ function sum(nums: number[]) {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+
   const parsed = QuerySchema.safeParse(
     Object.fromEntries(url.searchParams.entries())
   );
+
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: parsed.error.flatten() },
@@ -42,21 +45,42 @@ export async function GET(req: Request) {
 
   const availableMonths = await getAvailableMonthKeys();
   const current = getCurrentJakartaMonthKey();
+
   const defaultMonth = availableMonths.includes(current)
     ? current
     : availableMonths[availableMonths.length - 1] || "";
 
-  const startParam = (parsed.data.start ?? "").trim();
-  const endParam = (parsed.data.end ?? "").trim();
+  let months: string[] = [];
 
-  const start =
-    startParam && availableMonths.includes(startParam)
-      ? startParam
-      : defaultMonth;
-  const end = endParam && availableMonths.includes(endParam) ? endParam : start;
+  // =========================
+  // PRIORITAS: RANGE
+  // =========================
+  if (parsed.data.range) {
+    const range = parsed.data.range;
+    const currentIndex = availableMonths.indexOf(defaultMonth);
 
-  const months =
-    start && end ? pickMonthsInRange(availableMonths, start, end) : [];
+    let count = 3;
+    if (range === "6m") count = 6;
+    if (range === "1y") count = 12;
+
+    const startIndex = Math.max(0, currentIndex - (count - 1));
+    months = availableMonths.slice(startIndex, currentIndex + 1);
+  } else {
+    // fallback ke start-end manual
+    const startParam = (parsed.data.start ?? "").trim();
+    const endParam = (parsed.data.end ?? "").trim();
+
+    const start =
+      startParam && availableMonths.includes(startParam)
+        ? startParam
+        : defaultMonth;
+
+    const end =
+      endParam && availableMonths.includes(endParam) ? endParam : start;
+
+    months = start && end ? pickMonthsInRange(availableMonths, start, end) : [];
+  }
+
   if (!months.length) {
     return NextResponse.json({
       ok: true,
@@ -69,8 +93,11 @@ export async function GET(req: Request) {
 
   const topN = parsed.data.topN ?? 8;
 
-  // filter witel (multi)
+  // =========================
+  // FILTER WITEL
+  // =========================
   const witelParam = (parsed.data.witel ?? "ALL").trim();
+
   const selected =
     witelParam === "ALL"
       ? []
@@ -80,12 +107,16 @@ export async function GET(req: Request) {
           .filter(Boolean);
 
   const rows = await loadRowsByMonths(months);
+
   const filtered = selected.length
     ? rows.filter((r) => selected.includes(r.witel))
     : rows;
 
-  // agregasi sales per witel
+  // =========================
+  // AGREGASI SALES PER WITEL
+  // =========================
   const map = new Map<string, number>();
+
   for (const r of filtered) {
     const w = r.witel || "Unknown";
     map.set(w, (map.get(w) ?? 0) + (Number.isFinite(r.sales) ? r.sales : 0));
@@ -98,8 +129,8 @@ export async function GET(req: Request) {
   const top = itemsAll.slice(0, topN);
   const rest = itemsAll.slice(topN);
 
-  // kalau banyak, gabung sisanya ke "Lainnya" biar pie nggak rame
   const othersSales = sum(rest.map((x) => x.sales));
+
   const items =
     othersSales > 0 ? [...top, { witel: "Lainnya", sales: othersSales }] : top;
 

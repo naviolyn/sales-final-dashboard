@@ -58,7 +58,6 @@ export default function BestWitelPieCard({
       revalidateOnFocus: true,
     }
   );
-
   const items: { witel: string; sales: number }[] = data?.items ?? [];
 
   const chartData = items.map((x, idx) => ({

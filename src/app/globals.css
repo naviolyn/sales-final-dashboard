@@ -71,12 +71,13 @@ These serve as the fallback; there is no separate default.css file. */
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.708 0 0);
---chart-1: oklch(0.6801 0.1583 276.9349);
---chart-2: oklch(0.7845 0.1325 181.912);
+/* --chart-1: oklch(0.62 0.19 230); */
+--chart-1: oklch(0.7845 0.1325 181.912);
+--chart-2: oklch(0.546 0.245 262.881);
 --chart-3: oklch(0.879 0.1534 91.6054);
 --chart-4: oklch(0.7253 0.1752 349.7607);
 --chart-5: oklch(0.8003 0.1821 151.711);
---chart-6: oklch(0.62 0.19 230);
+--chart-6: oklch(0.6801 0.1583 276.9349);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.546 0.245 262.881);
@@ -110,11 +111,16 @@ These serve as the fallback; there is no separate default.css file. */
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  /* --chart-2: oklch(0.623 0.214 259.815); */
+  --chart-2: oklch(0.546 0.245 262.881);
+  /* --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638); */
+
+--chart-1: oklch(0.7845 0.1325 181.912);
+--chart-3: oklch(0.879 0.1534 91.6054);
+--chart-4: oklch(0.7253 0.1752 349.7607);
+--chart-5: oklch(0.8003 0.1821 151.711);
+--chart-6: oklch(0.62 0.19 230);
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.623 0.214 259.815);

@@ -113,7 +113,7 @@ export function DashboardHeaderAndCards() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold">Overview</h1>
 
         <div className="flex flex-col gap-8 sm:flex-row sm:flex-nowrap sm:items-end sm:justify-end">
           {/* FILTER PERIODE */}
