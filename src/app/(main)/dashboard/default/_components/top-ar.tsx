@@ -96,7 +96,7 @@ export default function TopARWideCard({
     })) ?? [];
 
   return (
-    <Card className="col-span-1 xl:col-span-3">
+    <Card className="col-span-1 xl:col-span-3 h-full">
       <CardHeader>
         <CardTitle>Top 5 AR by Sales</CardTitle>
         <CardDescription>
@@ -105,7 +105,7 @@ export default function TopARWideCard({
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="size-full h-64">
+      <CardContent className="size-full h-max">
         {error ? (
           <div className="text-sm text-destructive">
             Gagal load data Top AR.
