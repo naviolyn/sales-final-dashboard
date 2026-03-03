@@ -20,6 +20,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+
+
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   const json = await res.json();
@@ -52,11 +54,12 @@ function formatRangeLabel(months: string[]) {
 
 // warna pakai CSS var supaya nyatu sama theme (light/dark)
 const PIE_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
 ];
 
 export default function BestWitelPieCard({
@@ -92,20 +95,22 @@ export default function BestWitelPieCard({
   const items: { witel: string; sales: number }[] = data?.items ?? [];
   const months: string[] = data?.months ?? [];
 
-  const chartData = items.map((x, idx) => ({
-    name: x.witel,
-    sales: Number(x.sales ?? 0),
-    color: PIE_COLORS[idx % PIE_COLORS.length],
-  }));
-
+const chartData = items.map((x, idx) => ({
+  name: x.witel,
+  sales: Number(x.sales ?? 0),
+  fill: PIE_COLORS[idx % PIE_COLORS.length], // 👈 IMPORTANT: pakai `fill`
+}));
+// function toHsl(varRef: string) {
+//   return `hsl(${varRef})`;
+// }
   const totalSales = Number(data?.totalSales ?? 0);
 
   // ChartConfig untuk legend label
-  const config = React.useMemo(() => {
-    const cfg: Record<string, { label: string; color: string }> = {};
-    for (const d of chartData) cfg[d.name] = { label: d.name, color: d.fill };
-    return cfg as ChartConfig;
-  }, [chartData]);
+const config = React.useMemo(() => {
+  const cfg: Record<string, { label: string; color: string }> = {};
+  for (const d of chartData) cfg[d.name] = { label: d.name, color: d.fill };
+  return cfg as ChartConfig;
+}, [chartData]);
 
   return (
     <Card className="col-span-1 xl:col-span-2 h-full">
@@ -185,7 +190,7 @@ export default function BestWitelPieCard({
                           <span className="flex items-center gap-2">
                             <span
                               className="size-2.5 rounded-full"
-                            //   style={{background: item.fill  }}
+                              style={{ background: item.fill }}
                             />
                             <span className="truncate">{item.name}</span>
                           </span>
