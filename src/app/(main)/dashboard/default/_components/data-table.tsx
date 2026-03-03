@@ -70,7 +70,10 @@ export function DataTable({ data: initialData }: { data: z.infer<typeof sectionS
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed" />
       </TabsContent>
       <TabsContent value="key-personnel" className="flex flex-col">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed" />
+        <div className="overflow-hidden rounded-lg border">
+          <DataTableNew dndEnabled table={table} columns={columns} onReorder={setData} />
+        </div>
+        <DataTablePagination table={table} />
       </TabsContent>
       <TabsContent value="focus-documents" className="flex flex-col">
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed" />
