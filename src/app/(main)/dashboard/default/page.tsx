@@ -11,10 +11,10 @@ export default function Page() {
     <div className="@container/main flex flex-col gap-4 md:gap-6">
       <DashboardHeaderAndCards />
       <div className="flex flex-row max-lg:flex-col gap-4 md:gap-6 ">
-        <div className="xl:w-3/5">
+        {/* <div className="xl:w-3/5">
           <TopARCard />
-        </div>
-        <div className="xl:w-2/5">yey</div>
+        </div> */}
+        {/* <div className="xl:w-2/5">yey</div> */}
       </div>
 
       <ChartAreaInteractive />

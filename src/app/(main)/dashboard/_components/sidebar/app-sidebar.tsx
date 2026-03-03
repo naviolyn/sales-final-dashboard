@@ -20,7 +20,7 @@ import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { NavMain } from "./nav-main";
-import { NavUser } from "./nav-user";
+// import { NavUser } from "./nav-user";
 
 const _data = {
   navSecondary: [
@@ -78,8 +78,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default">
-                <Command />
-                <span className="font-semibold text-base">{APP_CONFIG.name}</span>
+                {/* <Command /> */}
+                <img className="h-4"
+                  src={APP_CONFIG.assets.logo}
+                  alt={`${APP_CONFIG.name} logo`}
+                />
+                <span className="font-semibold text-base">
+                  {/* {APP_CONFIG.name} */}
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -90,9 +96,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* <NavDocuments items={data.documents} /> */}
         {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
-      <SidebarFooter>
+      {/* <SidebarFooter>
         <NavUser user={rootUser} />
-      </SidebarFooter>
+      </SidebarFooter> */}
     </Sidebar>
   );
 }

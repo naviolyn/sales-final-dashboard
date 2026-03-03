@@ -6,6 +6,10 @@ export const APP_CONFIG = {
   name: "Indibiz",
   version: packageJson.version,
   copyright: `© ${currentYear}, Studio Admin.`,
+  assets: {
+    logo: "/images/indibiz.svg",
+    logoDark: "/images/indibiz.svg", // optional
+  },
   meta: {
     title: "Studio Admin - Modern Next.js Dashboard Starter Template",
     description:

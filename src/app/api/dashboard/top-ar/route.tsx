@@ -86,8 +86,16 @@ export async function GET(req: Request) {
 
   const rows = await loadRowsByMonths(months);
 
-  const filtered =
-    witel === "ALL" ? rows : rows.filter((r) => r.witel === witel);
+  const selected =
+    witel === "ALL"
+      ? []
+      : witel
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+  const filtered = selected.length
+    ? rows.filter((r) => selected.includes(r.witel))
+    : rows;
 
   // agregasi per AR (gabungan months terpilih)
   const arMap = new Map<string, any>();

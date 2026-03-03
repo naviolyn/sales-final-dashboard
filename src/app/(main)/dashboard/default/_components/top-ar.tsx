@@ -2,8 +2,14 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { useSearchParams } from "next/navigation";
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import {
   ChartContainer,
@@ -21,8 +27,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// import { topArChartConfig } from "./config-ar";
-
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   const json = await res.json();
@@ -31,48 +35,57 @@ const fetcher = async (url: string) => {
 };
 
 const topArChartConfig = {
-  sales: {
-    label: "Sales",
-    color: "var(--chart-2)",
-  },
+  sales: { label: "Sales", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
 function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-function fmtPeriode(data: any) {
-  // API kamu return "months" (array). Tapi biar backward-compatible, cek juga "month"
-  if (Array.isArray(data?.months) && data.months.length) return data.months.join(" - ");
-  if (typeof data?.month === "string" && data.month) return data.month;
-  return "-";
+function formatMonthLabel(key?: string) {
+  if (!key) return "-";
+  const [year, month] = key.split("-").map(Number);
+  if (!year || !month) return key;
+  return new Date(year, month - 1, 1).toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
-export default function TopARWideCard() {
-  const sp = useSearchParams();
+function formatRangeLabel(start?: string, end?: string) {
+  if (!start) return "-";
+  if (!end || start === end) return formatMonthLabel(start);
+  return `${formatMonthLabel(start)} – ${formatMonthLabel(end)}`;
+}
 
-  const start = sp.get("start") || "";
-  const end = sp.get("end") || "";
-  const month = sp.get("month") || "";
-  const witel = sp.get("witel") || "ALL";
-
+export default function TopARWideCard({
+  start,
+  end,
+  witel,
+}: {
+  start?: string;
+  end?: string;
+  witel?: string; // "ALL" or "Aceh,Sumut" (kalau mau multi)
+}) {
   const qs = React.useMemo(() => {
     const p = new URLSearchParams();
     if (start && end) {
       p.set("start", start);
       p.set("end", end);
-    } else if (month) {
-      p.set("month", month);
     }
-    p.set("witel", witel);
-    p.set("topN", "10");
+    if (witel && witel !== "ALL") p.set("witel", witel);
+    else p.set("witel", "ALL");
+    p.set("topN", "5");
     return p.toString();
-  }, [start, end, month, witel]);
+  }, [start, end, witel]);
 
   const { data, isLoading, error } = useSWR(
     `/api/dashboard/top-ar?${qs}`,
     fetcher,
-    { refreshInterval: 60_000, revalidateOnFocus: true }
+    {
+      refreshInterval: 60_000,
+      revalidateOnFocus: true,
+    }
   );
 
   const chartData =
@@ -85,14 +98,14 @@ export default function TopARWideCard() {
   return (
     <Card className="col-span-1 xl:col-span-3">
       <CardHeader>
-        <CardTitle>Top 10 AR by Sales</CardTitle>
+        <CardTitle>Top 5 AR by Sales</CardTitle>
         <CardDescription>
-          Periode: {fmtPeriode(data)}{" "}
-          {data?.witel ? `• Witel: ${data.witel}` : ""}
+          Periode: {formatRangeLabel(start, end)}{" "}
+          {witel && witel !== "ALL" ? `• Witel: ${witel}` : "• Semua Witel"}
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="size-full">
+      <CardContent className="size-full h-64">
         {error ? (
           <div className="text-sm text-destructive">
             Gagal load data Top AR.
@@ -103,8 +116,7 @@ export default function TopARWideCard() {
               accessibilityLayer
               data={chartData}
               layout="vertical"
-                barSize={36}
-                
+              barSize={36}
             >
               <CartesianGrid horizontal={false} />
               <YAxis
@@ -113,7 +125,6 @@ export default function TopARWideCard() {
                 tickLine={false}
                 tickMargin={10}
                 axisLine={false}
-                tickFormatter={(value) => value.slice(0, 3)}
                 hide
               />
               <XAxis type="number" hide />
@@ -135,7 +146,6 @@ export default function TopARWideCard() {
                 }
               />
 
-              {/* NO STACKED: cuma 1 Bar */}
               <Bar
                 dataKey="sales"
                 layout="vertical"
