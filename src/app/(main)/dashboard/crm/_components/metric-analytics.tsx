@@ -13,13 +13,17 @@ interface MetricAnalyticsProps {
 }
 
 export function MetricAnalytics({ metric }: MetricAnalyticsProps) {
-  const { start, end, witelParam } = useFilters();
+   const { start, end, witelParam } = useFilters();
 
-  const metricLabel = {
-    sales: "Sales",
-    poi: "POI",
-    coll: "Collection",
-  }[metric];
+   // Tunggu sampai filter siap
+   if (!start || !end) return null;
+
+   const metricLabel = {
+     sales: "Sales",
+     poi: "POI",
+     coll: "Collection",
+   }[metric];
+
 
   return (
     <div className="grid gap-6">

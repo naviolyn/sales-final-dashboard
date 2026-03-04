@@ -67,7 +67,7 @@ export const FilterContext = React.createContext<{
   witelParam: "ALL",
 });
 
-export function GlobalFilters() {
+export function GlobalFilters({ children }: { children?: React.ReactNode }) {
   const { data, isLoading } = useSWR<SummaryMetaResponse>(
     "/api/summary/meta",
     fetcher
@@ -111,7 +111,9 @@ export function GlobalFilters() {
   const setAllWitels = () => setSelectedWitels(witels);
 
   const witelParam =
-    selectedWitels.length === witels.length ? "ALL" : selectedWitels.join(",");
+    selectedWitels.length === 0 || selectedWitels.length === witels.length
+      ? "ALL"
+      : selectedWitels.join(",");
 
   const filterValue = React.useMemo(
     () => ({ start, end, selectedWitels, witelParam }),
@@ -120,108 +122,112 @@ export function GlobalFilters() {
 
   return (
     <FilterContext.Provider value={filterValue}>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Analytics Dashboard</CardTitle>
+      <div className="flex flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>Analytics Dashboard</CardTitle>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex items-end gap-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">
-                    Bulan Awal
-                  </span>
-                  <Select value={start} onValueChange={setStart}>
-                    <SelectTrigger className="w-[170px]">
-                      <SelectValue placeholder="Pilih bulan awal" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {months.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {formatMonthLabel(m)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex items-end gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      Bulan Awal
+                    </span>
+                    <Select value={start} onValueChange={setStart}>
+                      <SelectTrigger className="w-[170px]">
+                        <SelectValue placeholder="Pilih bulan awal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {formatMonthLabel(m)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="pb-2 text-sm text-muted-foreground">s.d.</div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      Bulan Akhir
+                    </span>
+                    <Select value={end} onValueChange={setEnd}>
+                      <SelectTrigger className="w-[170px]">
+                        <SelectValue placeholder="Pilih bulan akhir" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {formatMonthLabel(m)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="pb-2 text-sm text-muted-foreground">s.d.</div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-[200px] justify-between"
+                      disabled={isLoading}
+                    >
+                      {labelWitel(selectedWitels, witels)}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
 
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">
-                    Bulan Akhir
-                  </span>
-                  <Select value={end} onValueChange={setEnd}>
-                    <SelectTrigger className="w-[170px]">
-                      <SelectValue placeholder="Pilih bulan akhir" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {months.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {formatMonthLabel(m)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <PopoverContent className="w-[250px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Cari witel..." />
+                      <CommandList>
+                        <CommandEmpty>Witel tidak ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem onSelect={setAllWitels}>
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedWitels.length === witels.length
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Semua Witel
+                          </CommandItem>
+
+                          {witels.map((w) => {
+                            const checked = selectedWitels.includes(w);
+                            return (
+                              <CommandItem
+                                key={w}
+                                onSelect={() => toggleWitel(w)}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    checked ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {w}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-[200px] justify-between"
-                    disabled={isLoading}
-                  >
-                    {labelWitel(selectedWitels, witels)}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent className="w-[250px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Cari witel..." />
-                    <CommandList>
-                      <CommandEmpty>Witel tidak ditemukan.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem onSelect={setAllWitels}>
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedWitels.length === witels.length
-                                ? "opacity-100"
-                                : "opacity-0"
-                            )}
-                          />
-                          Semua Witel
-                        </CommandItem>
-
-                        {witels.map((w) => {
-                          const checked = selectedWitels.includes(w);
-                          return (
-                            <CommandItem
-                              key={w}
-                              onSelect={() => toggleWitel(w)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  checked ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {w}
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
             </div>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+        </Card>
+
+        {children}
+      </div>
     </FilterContext.Provider>
   );
 }

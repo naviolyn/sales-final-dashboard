@@ -4,9 +4,7 @@ import { MetricAnalytics } from "./_components/metric-analytics";
 
 export default function CRMPage() {
   return (
-    <div className="flex flex-col gap-6">
-      <GlobalFilters />
-
+    <GlobalFilters>
       <Tabs defaultValue="sales" className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-md">
           <TabsTrigger value="sales">Sales</TabsTrigger>
@@ -26,6 +24,6 @@ export default function CRMPage() {
           <MetricAnalytics metric="coll" />
         </TabsContent>
       </Tabs>
-    </div>
+    </GlobalFilters>
   );
 }
