@@ -58,6 +58,16 @@ function formatRangeLabel(start?: string, end?: string) {
   return `${formatMonthLabel(start)} – ${formatMonthLabel(end)}`;
 }
 
+/** "john doe smith" -> "John Doe" (max 2 kata, title case) */
+function shortName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export default function TopARWideCard({
   start,
   end,
@@ -65,7 +75,7 @@ export default function TopARWideCard({
 }: {
   start?: string;
   end?: string;
-  witel?: string; // "ALL" or "Aceh,Sumut" (kalau mau multi)
+  witel?: string;
 }) {
   const qs = React.useMemo(() => {
     const p = new URLSearchParams();
@@ -88,12 +98,12 @@ export default function TopARWideCard({
     }
   );
 
-  const chartData =
-    (data?.items ?? []).map((x: any) => ({
-      name: x.namaAr,
-      sales: Number(x.sales ?? 0),
-      witel: x.witel,
-    })) ?? [];
+  const chartData = (data?.items ?? []).map((x: any) => ({
+    shortName: shortName(x.namaAr),
+    fullName: x.namaAr,
+    sales: Number(x.sales ?? 0),
+    witel: x.witel,
+  }));
 
   return (
     <Card className="col-span-1 xl:col-span-3 h-full">
@@ -120,7 +130,7 @@ export default function TopARWideCard({
             >
               <CartesianGrid horizontal={false} />
               <YAxis
-                dataKey="name"
+                dataKey="shortName"
                 type="category"
                 tickLine={false}
                 tickMargin={10}
@@ -133,7 +143,10 @@ export default function TopARWideCard({
                 cursor={false}
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(label) => `${label}`}
+                    labelFormatter={(_label, payload) => {
+                      const item = payload?.[0]?.payload;
+                      return item?.fullName ?? _label;
+                    }}
                     formatter={(value, _name, item) => {
                       const payload: any = item?.payload;
                       return [
@@ -153,7 +166,7 @@ export default function TopARWideCard({
                 radius={[6, 6, 6, 6]}
               >
                 <LabelList
-                  dataKey="name"
+                  dataKey="shortName"
                   position="insideLeft"
                   offset={8}
                   className="fill-primary-foreground text-base"

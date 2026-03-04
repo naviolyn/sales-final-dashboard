@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   SquareArrowUpRight,
   Users,
+  Table
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -57,6 +58,11 @@ export const sidebarItems: NavGroup[] = [
         title: "CRM",
         url: "/dashboard/crm",
         icon: ChartBar,
+      },
+      {
+        title: "Data AR",
+        url: "/dashboard/ar-data",
+        icon: Table, // import Table from lucide-react
       },
       // {
       //   title: "Finance",

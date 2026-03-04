@@ -1,7 +1,8 @@
 "use client";
-import * as React from "react";
 
-import { ChartBar, Forklift, Gauge, GraduationCap, LayoutDashboard, Search, ShoppingBag } from "lucide-react";
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,67 +14,108 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-
-const searchItems = [
-  { group: "Dashboards", icon: LayoutDashboard, label: "Default" },
-  { group: "Dashboards", icon: ChartBar, label: "CRM", disabled: true },
-  { group: "Dashboards", icon: Gauge, label: "Analytics", disabled: true },
-  { group: "Dashboards", icon: ShoppingBag, label: "E-Commerce", disabled: true },
-  { group: "Dashboards", icon: GraduationCap, label: "Academy", disabled: true },
-  { group: "Dashboards", icon: Forklift, label: "Logistics", disabled: true },
-  { group: "Authentication", label: "Login v1" },
-  { group: "Authentication", label: "Login v2" },
-  { group: "Authentication", label: "Register v1" },
-  { group: "Authentication", label: "Register v2" },
-];
+import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 
 export function SearchDialog() {
   const [open, setOpen] = React.useState(false);
+  const router = useRouter();
+
+  // Keyboard shortcut ⌘J / Ctrl+J
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen((prev) => !prev);
       }
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  function handleSelect(url: string) {
+    setOpen(false);
+    router.push(url);
+  }
+
   return (
     <>
       <Button
-        variant="link"
-        className="!px-0 font-normal text-muted-foreground hover:no-underline"
+        variant="outline"
+        className="h-8 w-48 justify-between gap-2 px-3 text-sm text-muted-foreground shadow-none"
         onClick={() => setOpen(true)}
       >
-        <Search className="size-4" />
-        Search
-        <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
+        <span className="flex items-center gap-2">
+          <Search className="size-3.5" />
+          Cari halaman...
+        </span>
+        <kbd className="inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px]">
           <span className="text-xs">⌘</span>J
         </kbd>
       </Button>
+
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search dashboards, users, and more…" />
+        <CommandInput placeholder="Cari halaman..." />
         <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          {[...new Set(searchItems.map((item) => item.group))].map((group, i) => (
-            <React.Fragment key={group}>
-              {i !== 0 && <CommandSeparator />}
-              <CommandGroup heading={group} key={group}>
-                {searchItems
-                  .filter((item) => item.group === group)
-                  .map((item) => (
-                    <CommandItem className="!py-1.5" key={item.label} onSelect={() => setOpen(false)}>
-                      {item.icon && <item.icon />}
-                      <span>{item.label}</span>
+          <CommandEmpty>Tidak ada hasil.</CommandEmpty>
+
+          {sidebarItems.map((group, gi) => {
+            // Kumpulkan semua item (termasuk subItems) dari grup ini
+            const flatItems: {
+              title: string;
+              url: string;
+              groupLabel: string;
+              disabled?: boolean;
+            }[] = [];
+
+            for (const item of group.items) {
+              if (item.subItems?.length) {
+                for (const sub of item.subItems) {
+                  flatItems.push({
+                    title: sub.title,
+                    url: sub.url,
+                    groupLabel: group.label ?? item.title,
+                    disabled: sub.comingSoon,
+                  });
+                }
+              } else {
+                flatItems.push({
+                  title: item.title,
+                  url: item.url,
+                  groupLabel: group.label ?? "Menu",
+                  disabled: item.comingSoon,
+                });
+              }
+            }
+
+            if (!flatItems.length) return null;
+
+            return (
+              <React.Fragment key={group.id}>
+                {gi !== 0 && <CommandSeparator />}
+                <CommandGroup heading={group.label ?? "Menu"}>
+                  {flatItems.map((item) => (
+                    <CommandItem
+                      key={item.url}
+                      value={item.title}
+                      disabled={item.disabled}
+                      onSelect={() => !item.disabled && handleSelect(item.url)}
+                      className="gap-2"
+                    >
+                      <span>{item.title}</span>
+                      {item.disabled && (
+                        <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          Soon
+                        </span>
+                      )}
                     </CommandItem>
                   ))}
-              </CommandGroup>
-            </React.Fragment>
-          ))}
+                </CommandGroup>
+              </React.Fragment>
+            );
+          })}
         </CommandList>
       </CommandDialog>
     </>
   );
 }
+  

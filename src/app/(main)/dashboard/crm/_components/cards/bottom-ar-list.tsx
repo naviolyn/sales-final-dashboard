@@ -20,6 +20,16 @@ function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
+/** "john doe smith" -> "John Doe" (max 2 kata, title case) */
+function shortName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function BottomARList({ metric, metricLabel, start, end, witel }: any) {
   const qs = React.useMemo(() => {
     const p = new URLSearchParams();
@@ -66,8 +76,9 @@ export function BottomARList({ metric, metricLabel, start, end, witel }: any) {
                 className="flex items-center justify-between border-b pb-3 last:border-b-0"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">
-                    {idx + 1}. {it.namaAr}
+                  {/* Nama pendek ditampilkan, nama full di title (hover) */}
+                  <div className="font-medium truncate" title={it.namaAr}>
+                    {idx + 1}. {shortName(it.namaAr)}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {it.kodeSales ? `Kode: ${it.kodeSales} ` : ""}Witel:{" "}

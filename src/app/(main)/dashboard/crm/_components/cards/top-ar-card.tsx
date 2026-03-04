@@ -3,13 +3,6 @@
 import * as React from "react";
 import useSWR from "swr";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -17,12 +10,21 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -31,13 +33,23 @@ const fetcher = async (url: string) => {
   return json;
 };
 
+const chartConfig = {
+  value: { label: "Value", color: "var(--chart-1)" },
+} satisfies ChartConfig;
+
 function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-const chartConfig = {
-  value: { label: "Value", color: "var(--chart-1)" },
-} satisfies ChartConfig;
+/** "john doe smith" -> "John Doe" (max 2 kata, title case) */
+function shortName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
 
 interface TopARCardProps {
   metric: "sales" | "poi" | "coll";
@@ -60,8 +72,7 @@ export function TopARCard({
       p.set("start", start);
       p.set("end", end);
     }
-    if (witel && witel !== "ALL") p.set("witel", witel);
-    else p.set("witel", "ALL");
+    p.set("witel", witel && witel !== "ALL" ? witel : "ALL");
     p.set("topN", "5");
     p.set("metric", metric);
     return p.toString();
@@ -75,7 +86,8 @@ export function TopARCard({
 
   const chartData = React.useMemo(() => {
     return (data?.items ?? []).map((x: any) => ({
-      name: x.namaAr,
+      shortName: shortName(x.namaAr),
+      fullName: x.namaAr,
       value: Number(x[metric] ?? 0),
       witel: x.witel,
     }));
@@ -105,7 +117,7 @@ export function TopARCard({
             >
               <CartesianGrid horizontal={false} />
               <YAxis
-                dataKey="name"
+                dataKey="shortName"
                 type="category"
                 tickLine={false}
                 axisLine={false}
@@ -117,7 +129,10 @@ export function TopARCard({
                 cursor={false}
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(label) => `${label}`}
+                    labelFormatter={(_label, payload) => {
+                      const item = payload?.[0]?.payload;
+                      return item?.fullName ?? _label;
+                    }}
                     formatter={(value, _name, item) => {
                       const payload: any = item?.payload;
                       return [
@@ -136,7 +151,7 @@ export function TopARCard({
                 radius={[6, 6, 6, 6]}
               >
                 <LabelList
-                  dataKey="name"
+                  dataKey="shortName"
                   position="insideLeft"
                   offset={8}
                   className="fill-primary-foreground text-sm"
