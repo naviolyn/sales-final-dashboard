@@ -6,18 +6,13 @@ import {
   loadRowsByMonths,
 } from "@/server/loadMergedRows";
 
-
-
 const QuerySchema = z.object({
-  // dukung 2 mode:
-  // 1) single month: month=2026-02
-  // 2) range: start=2026-01&end=2026-03
   month: z.string().optional(),
   start: z.string().optional(),
   end: z.string().optional(),
-
-  witel: z.string().optional(), // "ALL" atau nama witel
+  witel: z.string().optional(),
   topN: z.coerce.number().min(1).max(50).optional(),
+  metric: z.enum(["sales", "poi", "coll"]).optional(),
 });
 
 function sum(nums: number[]) {
@@ -26,7 +21,6 @@ function sum(nums: number[]) {
   return t;
 }
 
-// ambil months di antara start..end (inclusive) berdasarkan list available
 function pickMonthsInRange(available: string[], start: string, end: string) {
   const s = available.indexOf(start);
   const e = available.indexOf(end);
@@ -48,36 +42,41 @@ export async function GET(req: Request) {
     );
   }
 
-  const availableMonths = await getAvailableMonthKeys(); // sudah sorted di fungsi kamu (idealnya)
+  const availableMonths = await getAvailableMonthKeys();
   const current = getCurrentJakartaMonthKey();
-
   const defaultMonth = availableMonths.includes(current)
     ? current
     : availableMonths[availableMonths.length - 1] || "";
 
   const topN = parsed.data.topN ?? 10;
-  const witel = (parsed.data.witel ?? "ALL").trim();
+  const metric = parsed.data.metric ?? "sales";
+  const witelParam = (parsed.data.witel ?? "ALL").trim();
 
-  // tentukan months terpilih
+  // Parse multi-witel (comma-separated)
+  const selectedWitels =
+    witelParam === "ALL"
+      ? []
+      : witelParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+  // Resolve months
   let months: string[] = [];
-
-  if (parsed.data.month) {
-    months = [parsed.data.month];
-  } else if (parsed.data.start && parsed.data.end) {
+  if (parsed.data.month) months = [parsed.data.month];
+  else if (parsed.data.start && parsed.data.end)
     months = pickMonthsInRange(
       availableMonths,
       parsed.data.start,
       parsed.data.end
     );
-  } else {
-    months = defaultMonth ? [defaultMonth] : [];
-  }
+  else months = defaultMonth ? [defaultMonth] : [];
 
   if (!months.length) {
     return NextResponse.json({
       ok: true,
       months: [],
-      witel,
+      witel: witelParam,
       items: [],
       totalSales: 0,
       lastSync: new Date().toISOString(),
@@ -86,18 +85,13 @@ export async function GET(req: Request) {
 
   const rows = await loadRowsByMonths(months);
 
-  const selected =
-    witel === "ALL"
-      ? []
-      : witel
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-  const filtered = selected.length
-    ? rows.filter((r) => selected.includes(r.witel))
-    : rows;
+  // Filter witel — support single dan multi
+  const filtered =
+    selectedWitels.length > 0
+      ? rows.filter((r) => selectedWitels.includes(r.witel))
+      : rows;
 
-  // agregasi per AR (gabungan months terpilih)
+  // Agregasi per AR
   const arMap = new Map<string, any>();
   for (const r of filtered) {
     const key = r.kodeSales || `${r.namaAr}|${r.witel}|${r.telda}`;
@@ -115,15 +109,19 @@ export async function GET(req: Request) {
     arMap.set(key, cur);
   }
 
+  // Sort descending berdasarkan metric yang dipilih
   const items = Array.from(arMap.values())
-    .sort((a, b) => b.sales - a.sales)
+    .sort((a, b) => b[metric] - a[metric])
     .slice(0, topN);
 
   return NextResponse.json({
     ok: true,
     months,
-    witel,
+    witel: witelParam,
+    metric,
     totalSales: sum(filtered.map((r) => r.sales)),
+    totalPoi: sum(filtered.map((r) => r.poi)),
+    totalColl: sum(filtered.map((r) => r.coll)),
     items,
     lastSync: new Date().toISOString(),
   });

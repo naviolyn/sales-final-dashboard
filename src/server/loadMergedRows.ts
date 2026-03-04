@@ -35,7 +35,10 @@ function pad2(n: number) {
 
 /** "November 2025" -> "2025-11" */
 function parseTabToKey(title: string): string | null {
-  const m = title.trim().toLowerCase().match(/^([a-z]+)\s+(\d{4})$/);
+  const m = title
+    .trim()
+    .toLowerCase()
+    .match(/^([a-z]+)\s+(\d{4})$/);
   if (!m) return null;
   const monthName = m[1];
   const year = Number(m[2]);
@@ -72,9 +75,10 @@ function toTitleCase(str: string) {
     .join(" ");
 }
 
-// ===== cache meta tab => monthKey -> tabTitle
+// ===== Cache 1: tab metadata (bulan -> nama tab)
 type MonthTabMap = Record<string, string>; // {"2025-11":"November 2025", ...}
-let tabCache: { expiresAt: number; map: MonthTabMap; months: string[] } | null = null;
+let tabCache: { expiresAt: number; map: MonthTabMap; months: string[] } | null =
+  null;
 
 async function getTabMap(ttlSeconds = 300) {
   if (tabCache && Date.now() < tabCache.expiresAt) return tabCache;
@@ -87,7 +91,7 @@ async function getTabMap(ttlSeconds = 300) {
     const title = s.properties?.title ?? "";
     const key = parseTabToKey(title);
     if (!key) continue;
-    map[key] = title; // tabName asli
+    map[key] = title;
   }
 
   const months = Object.keys(map).sort((a, b) => a.localeCompare(b));
@@ -98,6 +102,73 @@ async function getTabMap(ttlSeconds = 300) {
     months,
   };
   return tabCache;
+}
+
+// ===== Cache 2: row data per bulan (INI YANG BARU — mencegah quota exceeded)
+const rowCache = new Map<string, { expiresAt: number; rows: ARRow[] }>();
+
+// Untuk mencegah duplicate fetch saat banyak request paralel di waktu bersamaan
+const rowFetchPromises = new Map<string, Promise<ARRow[]>>();
+
+async function fetchAndParseRows(
+  monthKey: string,
+  tabName: string
+): Promise<ARRow[]> {
+  // Cek cache dulu
+  const cached = rowCache.get(monthKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.rows;
+
+  // Kalau sudah ada promise yang sedang jalan untuk bulan ini, tunggu saja
+  // (mencegah duplicate call saat beberapa endpoint request bulan yang sama paralel)
+  const existing = rowFetchPromises.get(monthKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const rangeA1 = `${tabName}!${DEFAULT_RANGE}`;
+      const values = await fetchSheetValues({
+        spreadsheetId: SPREADSHEET_ID,
+        rangeA1,
+      });
+
+      if (values.length < 2) return [];
+
+      const headers = values[0].map(normHeader);
+      const out: ARRow[] = [];
+
+      for (let i = 1; i < values.length; i++) {
+        const rowArr = values[i] ?? [];
+        const obj: Record<string, string> = {};
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = rowArr[j] != null ? String(rowArr[j]) : "";
+        }
+
+        out.push({
+          month: monthKey,
+          witel: toTitleCase(getCell(obj, "WITEL")),
+          telda: getCell(obj, "TELDA"),
+          kodeSales: getCell(obj, "KODE_SALES"),
+          namaAr: getCell(obj, "NAMA_AR"),
+          sales: toNumber(obj["SALES"]),
+          poi: toNumber(obj["POI"]),
+          coll: toNumber(obj["COLL"]),
+        });
+      }
+
+      // Simpan ke cache selama 5 menit
+      rowCache.set(monthKey, {
+        expiresAt: Date.now() + 5 * 60 * 1000,
+        rows: out,
+      });
+
+      return out;
+    } finally {
+      rowFetchPromises.delete(monthKey);
+    }
+  })();
+
+  rowFetchPromises.set(monthKey, promise);
+  return promise;
 }
 
 /** helper default bulan sekarang (Asia/Jakarta) -> "YYYY-MM" */
@@ -126,38 +197,7 @@ export async function loadRowsByMonths(months: string[]): Promise<ARRow[]> {
   const tasks = months.map(async (monthKey) => {
     const tabName = map[monthKey];
     if (!tabName) return [];
-
-    const rangeA1 = `${tabName}!${DEFAULT_RANGE}`;
-    const values = await fetchSheetValues({
-      spreadsheetId: SPREADSHEET_ID,
-      rangeA1,
-    });
-
-    if (values.length < 2) return [];
-
-    const headers = values[0].map(normHeader);
-    const out: ARRow[] = [];
-
-    for (let i = 1; i < values.length; i++) {
-      const rowArr = values[i] ?? [];
-      const obj: Record<string, string> = {};
-      for (let j = 0; j < headers.length; j++) {
-        obj[headers[j]] = rowArr[j] != null ? String(rowArr[j]) : "";
-      }
-
-      out.push({
-        month: monthKey,
-        witel: toTitleCase(getCell(obj, "WITEL")),
-        telda: getCell(obj, "TELDA"),
-        kodeSales: getCell(obj, "KODE_SALES"),
-        namaAr: getCell(obj, "NAMA_AR"),
-        sales: toNumber(obj["SALES"]),
-        poi: toNumber(obj["POI"]),
-        coll: toNumber(obj["COLL"]),
-      });
-    }
-
-    return out;
+    return fetchAndParseRows(monthKey, tabName);
   });
 
   const nested = await Promise.all(tasks);

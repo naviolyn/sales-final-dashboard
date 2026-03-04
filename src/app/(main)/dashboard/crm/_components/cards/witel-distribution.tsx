@@ -62,6 +62,7 @@ export function WitelDistribution({
     fetcher,
     { refreshInterval: 60_000 }
   );
+
   const items: any[] = data?.items ?? [];
 
   const chartData = items.map((x, idx) => ({
@@ -70,7 +71,13 @@ export function WitelDistribution({
     fill: PIE_COLORS[idx % PIE_COLORS.length],
   }));
 
-  const totalValue = Number(data?.totalSales ?? 0);
+  // Ambil total sesuai metric yang dipilih
+  const totalValue =
+    metric === "poi"
+      ? Number(data?.totalPoi ?? 0)
+      : metric === "coll"
+      ? Number(data?.totalColl ?? 0)
+      : Number(data?.totalSales ?? 0);
 
   const config = React.useMemo(() => {
     const cfg: Record<string, any> = {};

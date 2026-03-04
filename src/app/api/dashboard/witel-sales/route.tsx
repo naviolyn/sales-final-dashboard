@@ -12,6 +12,7 @@ const QuerySchema = z.object({
   end: z.string().optional(),
   witel: z.string().optional(),
   topN: z.coerce.number().min(1).max(20).optional(),
+  metric: z.enum(["sales", "poi", "coll"]).optional(),
 });
 
 function pickMonthsInRange(available: string[], start: string, end: string) {
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
     );
   }
 
+  const metric = parsed.data.metric ?? "sales";
   const availableMonths = await getAvailableMonthKeys();
   const current = getCurrentJakartaMonthKey();
 
@@ -52,9 +54,7 @@ export async function GET(req: Request) {
 
   let months: string[] = [];
 
-  // =========================
   // PRIORITAS: RANGE
-  // =========================
   if (parsed.data.range) {
     const range = parsed.data.range;
     const currentIndex = availableMonths.indexOf(defaultMonth);
@@ -66,7 +66,6 @@ export async function GET(req: Request) {
     const startIndex = Math.max(0, currentIndex - (count - 1));
     months = availableMonths.slice(startIndex, currentIndex + 1);
   } else {
-    // fallback ke start-end manual
     const startParam = (parsed.data.start ?? "").trim();
     const endParam = (parsed.data.end ?? "").trim();
 
@@ -93,9 +92,7 @@ export async function GET(req: Request) {
 
   const topN = parsed.data.topN ?? 8;
 
-  // =========================
   // FILTER WITEL
-  // =========================
   const witelParam = (parsed.data.witel ?? "ALL").trim();
 
   const selected =
@@ -112,33 +109,53 @@ export async function GET(req: Request) {
     ? rows.filter((r) => selected.includes(r.witel))
     : rows;
 
-  // =========================
-  // AGREGASI SALES PER WITEL
-  // =========================
-  const map = new Map<string, number>();
+  // AGREGASI METRIC PER WITEL
+  const map = new Map<string, { sales: number; poi: number; coll: number }>();
 
   for (const r of filtered) {
     const w = r.witel || "Unknown";
-    map.set(w, (map.get(w) ?? 0) + (Number.isFinite(r.sales) ? r.sales : 0));
+    const cur = map.get(w) ?? { sales: 0, poi: 0, coll: 0 };
+    cur.sales += Number.isFinite(r.sales) ? r.sales : 0;
+    cur.poi += Number.isFinite(r.poi) ? r.poi : 0;
+    cur.coll += Number.isFinite(r.coll) ? r.coll : 0;
+    map.set(w, cur);
   }
 
   const itemsAll = Array.from(map.entries())
-    .map(([witel, sales]) => ({ witel, sales }))
-    .sort((a, b) => b.sales - a.sales);
+    .map(([witel, vals]) => ({
+      witel,
+      sales: vals.sales,
+      poi: vals.poi,
+      coll: vals.coll,
+    }))
+    .sort((a, b) => b[metric] - a[metric]);
 
   const top = itemsAll.slice(0, topN);
   const rest = itemsAll.slice(topN);
 
-  const othersSales = sum(rest.map((x) => x.sales));
+  const othersValue = sum(rest.map((x) => x[metric]));
 
   const items =
-    othersSales > 0 ? [...top, { witel: "Lainnya", sales: othersSales }] : top;
+    othersValue > 0
+      ? [
+          ...top,
+          {
+            witel: "Lainnya",
+            sales: sum(rest.map((x) => x.sales)),
+            poi: sum(rest.map((x) => x.poi)),
+            coll: sum(rest.map((x) => x.coll)),
+          },
+        ]
+      : top;
 
   return NextResponse.json({
     ok: true,
     months,
     witel: witelParam,
+    metric,
     totalSales: sum(filtered.map((r) => r.sales)),
+    totalPoi: sum(filtered.map((r) => r.poi)),
+    totalColl: sum(filtered.map((r) => r.coll)),
     items,
     lastSync: new Date().toISOString(),
   });

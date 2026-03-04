@@ -40,9 +40,20 @@ export async function GET(req: Request) {
   const defaultMonth = availableMonths.includes(current)
     ? current
     : availableMonths[availableMonths.length - 1] || "";
-  const metric = parsed.data.metric || "sales";
-  const witel = (parsed.data.witel ?? "ALL").trim();
 
+  const metric = parsed.data.metric ?? "sales";
+  const witelParam = (parsed.data.witel ?? "ALL").trim();
+
+  // Parse multi-witel (comma-separated)
+  const selectedWitels =
+    witelParam === "ALL"
+      ? []
+      : witelParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+  // Resolve months
   let months: string[] = [];
   if (parsed.data.month) months = [parsed.data.month];
   else if (parsed.data.start && parsed.data.end)
@@ -64,9 +75,14 @@ export async function GET(req: Request) {
   }
 
   const rows = await loadRowsByMonths(months);
-  const filtered =
-    witel === "ALL" ? rows : rows.filter((r) => r.witel === witel);
 
+  // Filter witel — support single dan multi
+  const filtered =
+    selectedWitels.length > 0
+      ? rows.filter((r) => selectedWitels.includes(r.witel))
+      : rows;
+
+  // Agregasi per AR
   const arMap = new Map<string, number>();
   for (const r of filtered) {
     const key = r.kodeSales || `${r.namaAr}|${r.witel}|${r.telda}`;
@@ -83,7 +99,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     months,
-    witel,
+    witel: witelParam,
     metric,
     produktif,
     nonProduktif,

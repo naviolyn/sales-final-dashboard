@@ -7,13 +7,12 @@ import {
 } from "@/server/loadMergedRows";
 
 const QuerySchema = z.object({
-  // support 2 mode filter dashboard:
-  month: z.string().optional(), // single
-  start: z.string().optional(), // range
-  end: z.string().optional(), // range
-
-  witel: z.string().optional(), // "ALL" atau nama witel
+  month: z.string().optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
+  witel: z.string().optional(),
   bottomN: z.coerce.number().min(1).max(50).optional(),
+  metric: z.enum(["sales", "poi", "coll"]).optional(),
 });
 
 function sum(nums: number[]) {
@@ -49,10 +48,20 @@ export async function GET(req: Request) {
     ? current
     : availableMonths[availableMonths.length - 1] || "";
 
-  const witel = (parsed.data.witel ?? "ALL").trim();
+  const witelParam = (parsed.data.witel ?? "ALL").trim();
   const bottomN = parsed.data.bottomN ?? 5;
+  const metric = parsed.data.metric ?? "sales";
 
-  // resolve months
+  // Parse multi-witel (comma-separated)
+  const selectedWitels =
+    witelParam === "ALL"
+      ? []
+      : witelParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+  // Resolve months
   let months: string[] = [];
   if (parsed.data.month) months = [parsed.data.month];
   else if (parsed.data.start && parsed.data.end)
@@ -67,17 +76,21 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       months: [],
-      witel,
+      witel: witelParam,
       items: [],
       lastSync: new Date().toISOString(),
     });
   }
 
   const rows = await loadRowsByMonths(months);
-  const filtered =
-    witel === "ALL" ? rows : rows.filter((r) => r.witel === witel);
 
-  // agregasi per AR
+  // Filter witel — support single dan multi
+  const filtered =
+    selectedWitels.length > 0
+      ? rows.filter((r) => selectedWitels.includes(r.witel))
+      : rows;
+
+  // Agregasi per AR
   const arMap = new Map<string, any>();
   for (const r of filtered) {
     const key = r.kodeSales || `${r.namaAr}|${r.witel}|${r.telda}`;
@@ -95,18 +108,19 @@ export async function GET(req: Request) {
     arMap.set(key, cur);
   }
 
-  // bottom N: sort ASC sales
+  // Sort ascending berdasarkan metric yang dipilih, ambil bottom N
   const all = Array.from(arMap.values());
-
-  // optional: kalau kamu mau exclude AR yang sales=0? (nggak aku exclude)
-  const items = all.sort((a, b) => a.sales - b.sales).slice(0, bottomN);
+  const items = all.sort((a, b) => a[metric] - b[metric]).slice(0, bottomN);
 
   return NextResponse.json({
     ok: true,
     months,
-    witel,
+    witel: witelParam,
+    metric,
     bottomN,
     totalSales: sum(filtered.map((r) => r.sales)),
+    totalPoi: sum(filtered.map((r) => r.poi)),
+    totalColl: sum(filtered.map((r) => r.coll)),
     items,
     lastSync: new Date().toISOString(),
   });
