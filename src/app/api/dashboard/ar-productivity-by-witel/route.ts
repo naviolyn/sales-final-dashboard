@@ -12,7 +12,6 @@ const QuerySchema = z.object({
   end: z.string().optional(),
   witel: z.string().optional(),
   metric: z.enum(["sales", "poi", "coll"]).optional(),
-  breakdown: z.string().optional(), // "witel" -> kembalikan byWitel
 });
 
 function pickMonthsInRange(available: string[], start: string, end: string) {
@@ -44,7 +43,6 @@ export async function GET(req: Request) {
 
   const metric = parsed.data.metric ?? "sales";
   const witelParam = (parsed.data.witel ?? "ALL").trim();
-  const wantBreakdown = parsed.data.breakdown === "witel";
 
   const selectedWitels =
     witelParam === "ALL"
@@ -54,6 +52,7 @@ export async function GET(req: Request) {
           .map((s) => s.trim())
           .filter(Boolean);
 
+  // Resolve months
   let months: string[] = [];
   if (parsed.data.month) months = [parsed.data.month];
   else if (parsed.data.start && parsed.data.end)
@@ -68,9 +67,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       months: [],
-      produktif: 0,
-      nonProduktif: 0,
-      byWitel: [],
+      items: [],
       lastSync: new Date().toISOString(),
     });
   }
@@ -82,61 +79,42 @@ export async function GET(req: Request) {
       ? rows.filter((r) => selectedWitels.includes(r.witel))
       : rows;
 
-  // Agregasi per AR (total)
-  const arMap = new Map<string, { value: number; witel: string }>();
+  // Group by witel, then by AR key, then count produktif/non-produktif
+  // produktif = metric value > 3
+  const witelMap = new Map<string, Map<string, number>>();
+
   for (const r of filtered) {
-    const key = r.kodeSales || `${r.namaAr}|${r.witel}|${r.telda}`;
-    const cur = arMap.get(key) ?? { value: 0, witel: r.witel };
-    cur.value += r[metric];
-    arMap.set(key, cur);
+    const w = r.witel || "Unknown";
+    const arKey = r.kodeSales || `${r.namaAr}|${r.witel}|${r.telda}`;
+
+    if (!witelMap.has(w)) witelMap.set(w, new Map());
+    const arMap = witelMap.get(w)!;
+    arMap.set(arKey, (arMap.get(arKey) ?? 0) + (r[metric] ?? 0));
   }
 
-  let produktif = 0;
-  let nonProduktif = 0;
-  for (const entry of arMap.values()) {
-    if (entry.value > 3) produktif++;
-    else nonProduktif++;
-  }
-
-  // Breakdown per witel
-  let byWitel: { witel: string; produktif: number; nonProduktif: number }[] =
-    [];
-
-  if (wantBreakdown) {
-    // Agregasi per (witel, AR) lalu klasifikasikan
-    const witelArMap = new Map<string, Map<string, number>>();
-
-    for (const r of filtered) {
-      const wKey = r.witel || "Unknown";
-      const arKey = r.kodeSales || `${r.namaAr}|${r.witel}|${r.telda}`;
-
-      if (!witelArMap.has(wKey)) witelArMap.set(wKey, new Map());
-      const wMap = witelArMap.get(wKey)!;
-      wMap.set(arKey, (wMap.get(arKey) ?? 0) + r[metric]);
-    }
-
-    // Urutkan sesuai urutan witel yang dipilih, atau sort alphabet
-    const witelKeys = Array.from(witelArMap.keys()).sort((a, b) =>
-      a.localeCompare(b)
-    );
-
-    byWitel = witelKeys.map((witel) => {
-      const arEntries = Array.from(witelArMap.get(witel)!.values());
-      const prod = arEntries.filter((v) => v > 3).length;
-      const nonProd = arEntries.filter((v) => v <= 3).length;
-      return { witel, produktif: prod, nonProduktif: nonProd };
-    });
-  }
+  const items = Array.from(witelMap.entries())
+    .map(([witel, arMap]) => {
+      let produktif = 0;
+      let nonProduktif = 0;
+      for (const val of arMap.values()) {
+        if (val > 3) produktif++;
+        else nonProduktif++;
+      }
+      return {
+        witel,
+        produktif,
+        nonProduktif,
+        total: produktif + nonProduktif,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
 
   return NextResponse.json({
     ok: true,
     months,
     witel: witelParam,
     metric,
-    produktif,
-    nonProduktif,
-    total: produktif + nonProduktif,
-    byWitel,
+    items,
     lastSync: new Date().toISOString(),
   });
 }

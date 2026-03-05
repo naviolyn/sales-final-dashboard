@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   copyright: `© ${currentYear}, Studio Admin.`,
   assets: {
     logo: "/images/indibiz.svg",
-    logoDark: "/images/indibiz.svg", // optional
+    logoDark: "/images/dark-logo.svg", // optional
   },
   meta: {
     title: "Studio Admin - Modern Next.js Dashboard Starter Template",

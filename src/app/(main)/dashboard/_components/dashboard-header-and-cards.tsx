@@ -29,18 +29,17 @@ import { cn } from "@/lib/utils";
 
 import { SectionCards } from "../default/_components/section-cards";
 import TopARWideCard from "../default/_components/top-ar";
-// import BestWitelPieCard from "../default/_components/best-witel-pie-chart";
-import BottomARCard from "../default/_components/bottom-ar";
-
+import ProductivityChart from "../default/_components/productivity-chart";
 
 type SummaryMetaResponse = {
-  months: string[]; // ["2025-11","2025-12",...]
+  months: string[];
   witel: string[];
   defaultStart: string;
   defaultEnd: string;
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 function formatMonthLabel(key?: string) {
   if (!key) return "-";
 
@@ -54,6 +53,7 @@ function formatMonthLabel(key?: string) {
     year: "numeric",
   });
 }
+
 function labelWitel(selected: string[], all: string[]) {
   if (selected.length === 0 || selected.length === all.length)
     return "Semua Witel";
@@ -211,25 +211,15 @@ export function DashboardHeaderAndCards() {
 
       {/* KPI Cards */}
       <SectionCards start={start} end={end} witel={witelParam} />
-      <div className="flex flex-col w-full gap-4">
-        <div className="flex w-full flex-row gap-4  items-stretch">
-          <div className="w-1/2">
-            <TopARWideCard start={start} end={end} witel={witelParam} />
-          </div>
-          <div className="w-1/2">
-            <BottomARCard />
-          </div>
-        </div>
 
-        {/* <div className="xl:w-2/6">
-          <BestWitelPieCard
-            start={start}
-            end={end}
-            witel={witelParam}
-            topN={6}
-          />
-          {/* kamu bisa taruh TopARWideCard di sampingnya juga 
-        </div> */}
+      {/* Charts: Top AR (1/3) + Produktivitas (2/3) */}
+      <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-stretch">
+        <div className="w-full lg:w-1/3">
+          <TopARWideCard start={start} end={end} witel={witelParam} />
+        </div>
+        <div className="w-full lg:w-2/3">
+          <ProductivityChart start={start} end={end} witel={witelParam} />
+        </div>
       </div>
     </div>
   );

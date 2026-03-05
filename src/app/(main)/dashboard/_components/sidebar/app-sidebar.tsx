@@ -79,10 +79,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default">
                 {/* <Command /> */}
-                <img className="h-4"
-                  src={APP_CONFIG.assets.logo}
-                  alt={`${APP_CONFIG.name} logo`}
-                />
+                <>
+                  <img
+                    className="h-6 dark:hidden"
+                    src={APP_CONFIG.assets.logo}
+                    alt={`${APP_CONFIG.name} logo`}
+                  />
+                  {APP_CONFIG.assets.logoDark && (
+                    <img
+                      className="h-6 hidden dark:block"
+                      src={APP_CONFIG.assets.logoDark}
+                      alt={`${APP_CONFIG.name} logo`}
+                    />
+                  )}
+                </>
                 <span className="font-semibold text-base">
                   {/* {APP_CONFIG.name} */}
                 </span>
