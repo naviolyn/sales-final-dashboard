@@ -13,22 +13,44 @@ interface MetricAnalyticsProps {
 }
 
 export function MetricAnalytics({ metric }: MetricAnalyticsProps) {
-   const { start, end, witelParam } = useFilters();
+  const { start, end, witelParam } = useFilters();
 
-   // Tunggu sampai filter siap
-   if (!start || !end) return null;
+  if (!start || !end) return null;
 
-   const metricLabel = {
-     sales: "Sales",
-     poi: "POI",
-     coll: "Collection",
-   }[metric];
-
+  const metricLabel = {
+    sales: "Sales",
+    poi: "POI",
+    coll: "Collection",
+  }[metric];
 
   return (
-    <div className="grid gap-6">
-      {/* Row 1: Top AR & Bottom AR */}
-      <div className="grid gap-6 md:grid-cols-2">
+    <div className="flex flex-col gap-6">
+      {/* Row 1: Productivity (lebih lebar) + Witel Distribution */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Productivity: 3/5 di lg, full di mobile */}
+        <div className="lg:col-span-3">
+          <ProductivityCard
+            metric={metric}
+            metricLabel={metricLabel}
+            start={start}
+            end={end}
+            witel={witelParam}
+          />
+        </div>
+        {/* Witel Distribution: 2/5 di lg, full di mobile */}
+        <div className="lg:col-span-2">
+          <WitelDistribution
+            metric={metric}
+            metricLabel={metricLabel}
+            start={start}
+            end={end}
+            witel={witelParam}
+          />
+        </div>
+      </div>
+
+      {/* Row 2: Top AR + Bottom AR — 50:50 di md+, stack di mobile */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <TopARCard
           metric={metric}
           metricLabel={metricLabel}
@@ -37,24 +59,6 @@ export function MetricAnalytics({ metric }: MetricAnalyticsProps) {
           witel={witelParam}
         />
         <BottomARList
-          metric={metric}
-          metricLabel={metricLabel}
-          start={start}
-          end={end}
-          witel={witelParam}
-        />
-      </div>
-
-      {/* Row 2: Productivity & Witel Distribution */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <ProductivityCard
-          metric={metric}
-          metricLabel={metricLabel}
-          start={start}
-          end={end}
-          witel={witelParam}
-        />
-        <WitelDistribution
           metric={metric}
           metricLabel={metricLabel}
           start={start}

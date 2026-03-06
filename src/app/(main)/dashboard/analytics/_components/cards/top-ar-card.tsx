@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   XAxis,
   YAxis,
@@ -14,7 +15,6 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 
@@ -25,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getWitelColor } from "@/lib/witel-colors";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -33,15 +34,10 @@ const fetcher = async (url: string) => {
   return json;
 };
 
-const chartConfig = {
-  value: { label: "Value", color: "var(--chart-1)" },
-} satisfies ChartConfig;
-
 function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-/** "john doe smith" -> "John Doe" (max 2 kata, title case) */
 function shortName(name: string): string {
   return name
     .trim()
@@ -50,6 +46,52 @@ function shortName(name: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
 }
+
+function CustomTooltip({
+  active,
+  payload,
+  metricLabel,
+}: {
+  active?: boolean;
+  payload?: any[];
+  metricLabel: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  const witelColor = getWitelColor(d.witel);
+
+  return (
+    <div className="rounded-lg border bg-background px-3 py-2.5 shadow-md text-sm space-y-1.5">
+      <p className="font-semibold text-foreground">{d.fullName}</p>
+      {d.kodeSales && (
+        <p className="text-muted-foreground">
+          Kode AR:{" "}
+          <span className="font-medium text-foreground">{d.kodeSales}</span>
+        </p>
+      )}
+      <p className="flex items-center gap-1.5 text-muted-foreground">
+        Witel:
+        <span
+          className="size-2.5 rounded-full inline-block"
+          style={{ background: witelColor }}
+        />
+        <span className="font-medium text-foreground">{d.witel}</span>
+      </p>
+      <p className="text-muted-foreground">
+        {metricLabel}:{" "}
+        <span className="font-medium text-foreground tabular-nums">
+          {fmtNumber(d.value)}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+// Config statis — warna per bar dihandle Cell, bukan config
+const chartConfig = {
+  value: { label: "Value", color: "transparent" },
+} satisfies ChartConfig;
 
 interface TopARCardProps {
   metric: "sales" | "poi" | "coll";
@@ -88,10 +130,15 @@ export function TopARCard({
     return (data?.items ?? []).map((x: any) => ({
       shortName: shortName(x.namaAr),
       fullName: x.namaAr,
+      kodeSales: x.kodeSales,
       value: Number(x[metric] ?? 0),
       witel: x.witel,
+      color: getWitelColor(x.witel),
     }));
   }, [data?.items, metric]);
+
+  const BAR_HEIGHT = 44;
+  const chartHeight = chartData.length * (BAR_HEIGHT + 20) + 24;
 
   return (
     <Card className="h-full">
@@ -102,18 +149,29 @@ export function TopARCard({
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="size-full">
+      <CardContent className="px-2">
         {error ? (
           <div className="text-sm text-destructive">Gagal load data.</div>
         ) : isLoading ? (
-          <div className="text-sm text-muted-foreground">Memuat...</div>
+          <div className="space-y-3 px-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-10 w-full animate-pulse rounded bg-muted"
+              />
+            ))}
+          </div>
         ) : (
-          <ChartContainer config={chartConfig} className="h-[300px] w-full">
+          <ChartContainer
+            config={chartConfig}
+            style={{ height: chartHeight, width: "100%" }}
+          >
             <BarChart
               data={chartData}
               layout="vertical"
-              barSize={36}
-              margin={{ left: 0, right: 0 }}
+              barSize={BAR_HEIGHT}
+              barCategoryGap={20}
+              margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
             >
               <CartesianGrid horizontal={false} />
               <YAxis
@@ -127,40 +185,28 @@ export function TopARCard({
 
               <ChartTooltip
                 cursor={false}
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(_label, payload) => {
-                      const item = payload?.[0]?.payload;
-                      return item?.fullName ?? _label;
-                    }}
-                    formatter={(value, _name, item) => {
-                      const payload: any = item?.payload;
-                      return [
-                        fmtNumber(Number(value)),
-                        " ",
-                        `${metricLabel} • ${payload?.witel ?? ""}`,
-                      ];
-                    }}
-                  />
-                }
+                content={<CustomTooltip metricLabel={metricLabel} />}
               />
 
-              <Bar
-                dataKey="value"
-                fill="var(--color-value)"
-                radius={[6, 6, 6, 6]}
-              >
+              <Bar dataKey="value" layout="vertical" radius={[6, 6, 6, 6]}>
+                {/* Tiap bar warnanya dari witel AR tersebut */}
+                {chartData.map((d: { color: string }, i: number) => (
+                  <Cell key={`cell-${i}`} fill={d.color} />
+                ))}
+
                 <LabelList
                   dataKey="shortName"
                   position="insideLeft"
-                  offset={8}
-                  className="fill-primary-foreground text-sm"
+                  offset={14}
+                  className="fill-primary-foreground"
+                  style={{ fontSize: 14, fontWeight: 500 }}
                 />
                 <LabelList
                   dataKey="value"
                   position="insideRight"
-                  offset={8}
-                  className="fill-primary-foreground text-sm tabular-nums"
+                  offset={14}
+                  className="fill-primary-foreground tabular-nums"
+                  style={{ fontSize: 14, fontWeight: 600 }}
                   formatter={(v: any) => fmtNumber(Number(v))}
                 />
               </Bar>
