@@ -8,11 +8,9 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
   type ChartConfig,
 } from "@/components/ui/chart";
-
-import { Card, CardContent } from "@/components/ui/card";
+import { getWitelColor } from "@/lib/witel-colors";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -25,16 +23,6 @@ function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-// warna sinkron sama theme
-const PIE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--chart-6)",
-];
-
 export default function BestWitelPieCard({
   range,
   witel,
@@ -46,119 +34,118 @@ export default function BestWitelPieCard({
     const p = new URLSearchParams();
     p.set("range", range);
     p.set("witel", witel ?? "ALL");
-    p.set("topN", "6");
     return p.toString();
   }, [range, witel]);
 
   const { data, isLoading, error } = useSWR(
     `/api/dashboard/witel-sales?${qs}`,
     fetcher,
-    {
-      refreshInterval: 60_000,
-      revalidateOnFocus: true,
-    }
+    { refreshInterval: 60_000, revalidateOnFocus: true }
   );
+
   const items: { witel: string; sales: number }[] = data?.items ?? [];
 
-  const chartData = items.map((x, idx) => ({
+  const chartData = items.map((x) => ({
     name: x.witel,
     sales: Number(x.sales ?? 0),
-    fill: PIE_COLORS[idx % PIE_COLORS.length],
+    fill: getWitelColor(x.witel), // ← pakai nama, bukan index
   }));
 
   const totalSales = Number(data?.totalSales ?? 0);
 
-  const config = React.useMemo(() => {
+  const config = React.useMemo<ChartConfig>(() => {
     const cfg: Record<string, { label: string; color: string }> = {};
     for (const d of chartData) cfg[d.name] = { label: d.name, color: d.fill };
     return cfg as ChartConfig;
   }, [chartData]);
 
-  return (
-    <Card className="h-[300px]">
-      <CardContent className="h-full flex items-center justify-center">
-        {error ? (
-          <div className="text-sm text-destructive">Gagal load data Witel.</div>
-        ) : (
-          <ChartContainer config={config} className="w-full h-full">
-            <PieChart>
-              <ChartTooltip
-                cursor={false}
-                content={<ChartTooltipContent hideLabel />}
-              />
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-destructive">
+        Gagal load data Witel.
+      </div>
+    );
+  }
 
-              <Pie
-                data={chartData}
-                dataKey="sales"
-                nameKey="name"
-                innerRadius={65}
-                outerRadius={90}
-                paddingAngle={2}
-                cornerRadius={4}
-                isAnimationActive={!isLoading}
-              >
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                      return (
-                        <text
+  return (
+    <div className="flex w-full flex-col">
+      {/* <p className="mb-3 text-sm font-medium text-muted-foreground">
+        Distribusi per Witel
+      </p> */}
+      <div className="flex items-center gap-2">
+        <ChartContainer
+          config={config}
+          className="h-[220px] w-[220px] shrink-0"
+        >
+          <PieChart>
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent hideLabel />}
+            />
+            <Pie
+              data={chartData}
+              dataKey="sales"
+              nameKey="name"
+              innerRadius={72}
+              outerRadius={100}
+              paddingAngle={2}
+              cornerRadius={4}
+              isAnimationActive={!isLoading}
+            >
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                    return (
+                      <text
+                        x={viewBox.cx}
+                        y={viewBox.cy}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
+                          className="fill-foreground text-2xl font-bold tabular-nums"
                         >
-                          <tspan
-                            x={viewBox.cx}
-                            y={viewBox.cy}
-                            className="fill-foreground font-bold text-3xl tabular-nums"
-                          >
-                            {isLoading ? "…" : fmtNumber(totalSales)}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy ?? 0) + 22}
-                            className="fill-muted-foreground text-sm"
-                          >
-                            Total Sales
-                          </tspan>
-                        </text>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </Pie>
-
-              <ChartLegend
-                layout="vertical"
-                verticalAlign="middle"
-                align="right"
-                content={() => (
-                  <ul className="ml-6 flex flex-col gap-2">
-                    {chartData.map((item) => (
-                      <li
-                        key={item.name}
-                        className="flex w-40 items-center justify-between text-sm"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="size-2.5 rounded-full"
-                            style={{ background: item.fill }}
-                          />
-                          <span className="truncate">{item.name}</span>
-                        </span>
-                        <span className="tabular-nums">
-                          {fmtNumber(item.sales)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                          {isLoading ? "…" : fmtNumber(totalSales)}
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy ?? 0) + 20}
+                          className="fill-muted-foreground text-xs"
+                        >
+                          Total Sales
+                        </tspan>
+                      </text>
+                    );
+                  }
+                  return null;
+                }}
               />
-            </PieChart>
-          </ChartContainer>
-        )}
-      </CardContent>
-    </Card>
+            </Pie>
+          </PieChart>
+        </ChartContainer>
+
+        <ul className="flex flex-col gap-2">
+          {chartData.map((item) => (
+            <li
+              key={item.name}
+              className="flex items-center justify-between gap-3 text-xs"
+            >
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ background: item.fill }}
+                />
+                <span className="max-w-[90px] truncate">{item.name}</span>
+              </span>
+              <span className="tabular-nums font-medium">
+                {fmtNumber(item.sales)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }

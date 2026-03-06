@@ -36,10 +36,9 @@ export default async function Page() {
   const syncLabel = formatSyncTime(lastSync);
 
   return (
-    <div className="@container/main flex flex-col gap-4 md:gap-4">
+    <div className="@container/main flex flex-col gap-6 pb-6">
       <DashboardHeaderAndCards />
       <ChartSalesByWitel />
-
       <DataTable data={data} />
 
       {/* Last sync */}
