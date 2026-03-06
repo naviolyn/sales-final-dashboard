@@ -11,7 +11,6 @@ function sum(nums: number[]) {
   return t;
 }
 
-// ===== month helpers (YYYY-MM) =====
 function parseMonthKey(key: string) {
   const [y, m] = key.split("-").map(Number);
   return { y, m };
@@ -69,7 +68,6 @@ export async function GET(req: Request) {
   const availableMonths = await getAvailableMonthKeys();
   const availableSet = new Set(availableMonths);
 
-  // ===== default start/end =====
   const current = getCurrentJakartaMonthKey();
   const defaultMonth = availableSet.has(current)
     ? current
@@ -84,7 +82,6 @@ export async function GET(req: Request) {
   const startFixed = start <= end ? start : end;
   const endFixed = start <= end ? end : start;
 
-  // ===== selected & previous range =====
   const selectedRaw =
     startFixed && endFixed ? buildRange(startFixed, endFixed) : [];
   const selectedMonths = clampToAvailable(selectedRaw, availableSet);
@@ -92,14 +89,12 @@ export async function GET(req: Request) {
   const prevRaw = previousPeriod(selectedRaw);
   const prevMonths = clampToAvailable(prevRaw, availableSet);
 
-  // ===== witel =====
   const witelParam = (searchParams.get("witel") || "").trim();
   const selectedWitel = witelParam
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // ===== load current rows =====
   const curAll = selectedMonths.length
     ? await loadRowsByMonths(selectedMonths)
     : [];
@@ -107,13 +102,11 @@ export async function GET(req: Request) {
     ? curAll.filter((r) => selectedWitel.includes(r.witel))
     : curAll;
 
-  // ===== load previous rows =====
   const prevAll = prevMonths.length ? await loadRowsByMonths(prevMonths) : [];
   const prevRows = selectedWitel.length
     ? prevAll.filter((r) => selectedWitel.includes(r.witel))
     : prevAll;
 
-  // ===== KPI totals =====
   const curSales = sum(curRows.map((r) => r.sales));
   const curPOI = sum(curRows.map((r) => r.poi));
   const curColl = sum(curRows.map((r) => r.coll));
@@ -122,7 +115,6 @@ export async function GET(req: Request) {
   const prevPOI = sum(prevRows.map((r) => r.poi));
   const prevColl = sum(prevRows.map((r) => r.coll));
 
-  // ===== AR Produktif (current & prev) =====
   const curProd = productiveARCountFromRows(curRows);
   const prevProd = productiveARCountFromRows(prevRows);
 
@@ -133,7 +125,6 @@ export async function GET(req: Request) {
       value: curSales,
       unit: "number",
       deltaPct: deltaPct(curSales, prevSales),
-      subtitle: `Periode: ${selectedMonths.join(", ")}`,
     },
     {
       id: "total_poi",
@@ -141,7 +132,6 @@ export async function GET(req: Request) {
       value: curPOI,
       unit: "number",
       deltaPct: deltaPct(curPOI, prevPOI),
-      subtitle: `Periode: ${selectedMonths.join(", ")}`,
     },
     {
       id: "total_collection",
@@ -149,26 +139,23 @@ export async function GET(req: Request) {
       value: curColl,
       unit: "number",
       deltaPct: deltaPct(curColl, prevColl),
-      subtitle: `Periode: ${selectedMonths.join(", ")}`,
     },
     {
       id: "ar_productive",
       title: "AR Produktif",
       value: curProd.count,
+      totalAr: curProd.arTotal, // ← tambahan
       unit: "number",
       deltaPct: deltaPct(curProd.count, prevProd.count),
-      subtitle: `Sales > 3 pada periode terpilih`,
     },
   ];
 
   return NextResponse.json({
     cards,
     lastSync: new Date().toISOString(),
-
     availableMonths,
     selected: { start: startFixed, end: endFixed, months: selectedMonths },
     previous: { months: prevMonths },
-
     rowCount: curRows.length,
     rowCountPrev: prevRows.length,
     arCount: curProd.arTotal,

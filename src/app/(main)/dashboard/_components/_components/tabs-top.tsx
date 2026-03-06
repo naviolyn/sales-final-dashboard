@@ -2,16 +2,14 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import {
-  CalendarRange,
-  Check,
-  ChevronsUpDown,
-  MapPin,
-  RefreshCw,
-} from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -21,23 +19,17 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { getWitelColor } from "@/lib/witel-colors";
+// import { BestWitelPieCard } from "./best-witel-pie-chart";
 
-import { SectionCards } from "../default/_components/section-cards";
-import TopARWideCard from "../default/_components/top-ar";
-import ProductivityChart from "../default/_components/productivity-chart";
 
 type SummaryMetaResponse = {
   months: string[];
@@ -50,40 +42,29 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function formatMonthLabel(key?: string) {
   if (!key) return "-";
+
   const [year, month] = key.split("-").map(Number);
   if (!year || !month) return key;
+
   const date = new Date(year, month - 1, 1);
-  return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+
+  return date.toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
-/** Badge witel dengan warna dinamis dari --witel-N */
-function WitelBadge({ witel }: { witel: string }) {
-  const color = getWitelColor(witel);
-
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors"
-      style={{
-        borderColor: color,
-        color: color,
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-      }}
-    >
-      {/* Dot penanda warna */}
-      <span
-        className="size-2 shrink-0 rounded-full"
-        style={{ background: color }}
-      />
-      {witel}
-    </span>
-  );
+function labelWitel(selected: string[], all: string[]) {
+  if (selected.length === 0 || selected.length === all.length)
+    return "Semua Witel";
+  if (selected.length === 1) return selected[0];
+  return `${selected.length} dipilih`;
 }
 
-export function DashboardHeaderAndCards() {
+export function TabsTop() {
   const { data, isLoading } = useSWR<SummaryMetaResponse>(
     "/api/summary/meta",
-    fetcher,
-    { refreshInterval: 60_000 }
+    fetcher
   );
 
   const months = data?.months ?? [];
@@ -91,22 +72,28 @@ export function DashboardHeaderAndCards() {
 
   const [start, setStart] = React.useState<string>("");
   const [end, setEnd] = React.useState<string>("");
+  const [selectedWitels, setSelectedWitels] = React.useState<string[]>([]);
 
+  // set default range
   React.useEffect(() => {
-    if (data?.defaultStart && !start) {
+    if (data?.defaultStart) {
       setStart(data.defaultStart);
       setEnd(data.defaultEnd);
     }
-  }, [data, start]);
+  }, [data]);
 
+  // ensure start <= end
   React.useEffect(() => {
-    if (start && end && start > end) setEnd(start);
+    if (start && end && start > end) {
+      setEnd(start);
+    }
   }, [start, end]);
 
-  const [selectedWitels, setSelectedWitels] = React.useState<string[]>([]);
-
+  // default all witels selected
   React.useEffect(() => {
-    if (witels.length && selectedWitels.length === 0) setSelectedWitels(witels);
+    if (witels.length) {
+      setSelectedWitels(witels);
+    }
   }, [witels]);
 
   const toggleWitel = (w: string) => {
@@ -119,58 +106,22 @@ export function DashboardHeaderAndCards() {
 
   const setAllWitels = () => setSelectedWitels(witels);
 
-  const witelParam =
-    selectedWitels.length === witels.length ? "ALL" : selectedWitels.join(",");
-
-  const periodLabel = React.useMemo(() => {
-    if (!start) return "-";
-    if (!end || start === end) return formatMonthLabel(start);
-    return `${formatMonthLabel(start)} – ${formatMonthLabel(end)}`;
-  }, [start, end]);
-
-  const isAllWitels =
-    selectedWitels.length === 0 || selectedWitels.length === witels.length;
-
   return (
-    <div className="space-y-4">
-      {/* Header row */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        {/* Kiri: judul + ringkasan filter aktif */}
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold">Overview</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              Menampilkan data untuk:
-            </span>
+    <Tabs defaultValue="sales" className="w-full flex-col gap-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <TabsList>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="ar">AR</TabsTrigger>
+          <TabsTrigger value="poi">POI</TabsTrigger>
+        </TabsList>
 
-            {/* Badge periode — tetap pakai Badge biasa */}
-            <Badge variant="secondary" className="gap-1.5 text-xs font-normal">
-              <CalendarRange className="size-3 shrink-0" />
-              {periodLabel}
-            </Badge>
-
-            {/* Badge witel: semua → satu badge biasa, sebagian → WitelBadge per witel */}
-            {isAllWitels ? (
-              <Badge
-                variant="secondary"
-                className="gap-1.5 text-xs font-normal"
-              >
-                <MapPin className="size-3 shrink-0" />
-                Semua Witel
-              </Badge>
-            ) : (
-              selectedWitels.map((w) => <WitelBadge key={w} witel={w} />)
-            )}
-          </div>
-        </div>
-
-        {/* Kanan: filter controls */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-end">
+        <div className="flex flex-wrap gap-4 items-end">
+          {/* FILTER PERIODE */}
           <div className="flex items-end gap-2">
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Bulan Awal</span>
               <Select value={start} onValueChange={setStart}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Pilih bulan awal" />
                 </SelectTrigger>
                 <SelectContent>
@@ -182,11 +133,13 @@ export function DashboardHeaderAndCards() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="pb-2 text-sm text-muted-foreground">s.d.</div>
+
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Bulan Akhir</span>
               <Select value={end} onValueChange={setEnd}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Pilih bulan akhir" />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,6 +153,7 @@ export function DashboardHeaderAndCards() {
             </div>
           </div>
 
+          {/* WITEL MULTI SELECT */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -207,14 +161,11 @@ export function DashboardHeaderAndCards() {
                 className="w-[200px] justify-between"
                 disabled={isLoading}
               >
-                {isAllWitels
-                  ? "Semua Witel"
-                  : selectedWitels.length === 1
-                  ? selectedWitels[0]
-                  : `${selectedWitels.length} Witel dipilih`}
+                {labelWitel(selectedWitels, witels)}
                 <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-[250px] p-0">
               <Command>
                 <CommandInput placeholder="Cari witel..." />
@@ -225,11 +176,14 @@ export function DashboardHeaderAndCards() {
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          isAllWitels ? "opacity-100" : "opacity-0"
+                          selectedWitels.length === witels.length
+                            ? "opacity-100"
+                            : "opacity-0"
                         )}
                       />
                       Semua Witel
                     </CommandItem>
+
                     {witels.map((w) => {
                       const checked = selectedWitels.includes(w);
                       return (
@@ -252,18 +206,23 @@ export function DashboardHeaderAndCards() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <SectionCards start={start} end={end} witel={witelParam} />
+      <TabsContent value="sales">
+        <div className="rounded-lg border p-6 h-[400px] flex items-center justify-center text-muted-foreground">
+          {/* <BestWitelPieCard start={start} end={end} witels={selectedWitels} /> */}
+        </div>
+      </TabsContent>
 
-      {/* Charts: Top AR + Produktivitas */}
-      <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-stretch">
-        <div className="w-full lg:w-1/3">
-          <TopARWideCard start={start} end={end} witel={witelParam} />
+      <TabsContent value="ar">
+        <div className="rounded-lg border p-6 h-[400px] flex items-center justify-center text-muted-foreground">
+          Chart AR Here
         </div>
-        <div className="w-full lg:w-2/3">
-          <ProductivityChart start={start} end={end} witel={witelParam} />
+      </TabsContent>
+
+      <TabsContent value="poi">
+        <div className="rounded-lg border p-6 h-[400px] flex items-center justify-center text-muted-foreground">
+          Chart POI Here
         </div>
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }
