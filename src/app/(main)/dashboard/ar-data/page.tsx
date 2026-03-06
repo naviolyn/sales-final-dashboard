@@ -341,8 +341,8 @@ export default function ARDataPage() {
 
   return (
     <div
-      className="flex flex-col gap-3 p-4"
-      style={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}
+      className="flex flex-col gap-3 p-4 h-screen overflow-hidden"
+      style={{ width: "100%", maxWidth: "100%" }}
     >
       <div>
         <h1 className="text-xl font-semibold">Data AR</h1>
@@ -357,7 +357,7 @@ export default function ARDataPage() {
       </div>
 
       {/* FILTER CARD */}
-      <Card className="w-full overflow-hidden py-4 gap-2">
+      <Card className="w-full overflow-hidden py-4 gap-2 shrink-0">
         <CardContent className="flex flex-col gap-3 px-4 pb-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5">
@@ -566,12 +566,13 @@ export default function ARDataPage() {
         </CardContent>
       </Card>
 
-      {/* TABLE CARD */}
-      <Card className="w-full overflow-hidden py-4">
-        <CardContent className="p-0">
-          <div className="w-full overflow-x-auto">
-            <Table className="max-w-full min-w-[400px]">
-              <TableHeader>
+      {/* TABLE CARD — flex-1 + min-h-0 agar card mengisi sisa ruang dan tidak melar */}
+      <Card className="w-full flex flex-col min-h-0 flex-1 overflow-hidden py-4">
+        <CardContent className="p-0 flex flex-col min-h-0 flex-1">
+          {/* Scrollable area untuk tabel */}
+          <div className="flex-1 min-h-0 overflow-auto">
+            <Table className="min-w-[400px]">
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   {showCol("no") && (
                     <TableHead className="w-12 text-center">#</TableHead>
@@ -824,7 +825,8 @@ export default function ARDataPage() {
             </Table>
           </div>
 
-          <div className="flex items-center justify-between border-t px-4 py-3">
+          {/* Pagination — selalu nempel di bawah card */}
+          <div className="flex items-center justify-between border-t px-4 py-3 shrink-0">
             <p className="text-sm text-muted-foreground">
               {total > 0
                 ? `Menampilkan ${(page - 1) * pageSize + 1}–${Math.min(
