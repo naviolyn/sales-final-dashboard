@@ -24,7 +24,7 @@ interface AnalyticsFiltersContextValue {
   bulan: string;
   setBulan: (v: string) => void;
   selectedWitels: string[];
-  setSelectedWitels: (v: string[]) => void;
+  setSelectedWitels: React.Dispatch<React.SetStateAction<string[]>>;
   witelParam: string;
 }
 
