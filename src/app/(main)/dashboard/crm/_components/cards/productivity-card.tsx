@@ -123,7 +123,7 @@ export function ProductivityCard({
                   <ChartTooltipContent
                     formatter={(value, name) => [
                       value,
-                      name === "produktif" ? "Produktif" : "Non-Produktif",
+                      name === "produktif" ? " Produktif" : " Non-Produktif",
                     ]}
                   />
                 }

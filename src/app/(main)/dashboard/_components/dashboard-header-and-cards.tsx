@@ -2,14 +2,16 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { Check, ChevronsUpDown } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  CalendarRange,
+  Check,
+  ChevronsUpDown,
+  MapPin,
+  RefreshCw,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -18,6 +20,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -42,35 +49,34 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function formatMonthLabel(key?: string) {
   if (!key) return "-";
-
   const [year, month] = key.split("-").map(Number);
   if (!year || !month) return key;
-
   const date = new Date(year, month - 1, 1);
-
-  return date.toLocaleDateString("id-ID", {
-    month: "long",
-    year: "numeric",
-  });
+  return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
 
-function labelWitel(selected: string[], all: string[]) {
-  if (selected.length === 0 || selected.length === all.length)
-    return "Semua Witel";
-  if (selected.length === 1) return selected[0];
-  return `${selected.length} dipilih`;
+function formatSyncTime(isoString?: string) {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  return date.toLocaleString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function DashboardHeaderAndCards() {
   const { data, isLoading } = useSWR<SummaryMetaResponse>(
     "/api/summary/meta",
-    fetcher
+    fetcher,
+    { refreshInterval: 60_000 }
   );
 
   const months = data?.months ?? [];
   const witels = data?.witel ?? [];
 
-  // ===== RANGE START - END =====
   const [start, setStart] = React.useState<string>("");
   const [end, setEnd] = React.useState<string>("");
 
@@ -81,20 +87,14 @@ export function DashboardHeaderAndCards() {
     }
   }, [data, start]);
 
-  // Pastikan start <= end
   React.useEffect(() => {
-    if (start && end && start > end) {
-      setEnd(start);
-    }
+    if (start && end && start > end) setEnd(start);
   }, [start, end]);
 
-  // ===== WITEL MULTI =====
   const [selectedWitels, setSelectedWitels] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    if (witels.length && selectedWitels.length === 0) {
-      setSelectedWitels(witels);
-    }
+    if (witels.length && selectedWitels.length === 0) setSelectedWitels(witels);
   }, [witels]);
 
   const toggleWitel = (w: string) => {
@@ -110,19 +110,69 @@ export function DashboardHeaderAndCards() {
   const witelParam =
     selectedWitels.length === witels.length ? "ALL" : selectedWitels.join(",");
 
+  // Label ringkasan periode
+  const periodLabel = React.useMemo(() => {
+    if (!start) return "-";
+    if (!end || start === end) return formatMonthLabel(start);
+    return `${formatMonthLabel(start)} – ${formatMonthLabel(end)}`;
+  }, [start, end]);
+
+  // Label witel: semua → teks, sebagian → tampilkan masing-masing
+  const isAllWitels =
+    selectedWitels.length === 0 || selectedWitels.length === witels.length;
+
+
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold">Overview</h1>
+      {/* Header row */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        {/* Kiri: judul + ringkasan filter aktif */}
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold">Overview</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Menampilkan data untuk:
+            </span>
 
-        <div className="flex flex-col gap-8 sm:flex-row sm:flex-nowrap sm:items-end sm:justify-end">
-          {/* FILTER PERIODE */}
+            {/* Badge periode */}
+            <Badge variant="secondary" className="gap-1.5 text-xs font-normal">
+              <CalendarRange className="size-3 shrink-0" />
+              {periodLabel}
+            </Badge>
+
+            {/* Badge witel: satu badge "Semua Witel" atau badge per witel */}
+            {isAllWitels ? (
+              <Badge
+                variant="secondary"
+                className="gap-1.5 text-xs font-normal"
+              >
+                <MapPin className="size-3 shrink-0" />
+                Semua Witel
+              </Badge>
+            ) : (
+              selectedWitels.map((w) => (
+                <Badge
+                  key={w}
+                  variant="secondary"
+                  className="gap-1.5 text-xs font-normal"
+                >
+                  <MapPin className="size-3 shrink-0" />
+                  {w}
+                </Badge>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Kanan: filter controls */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-end">
+          {/* Filter periode */}
           <div className="flex items-end gap-2">
-            {/* Bulan Awal */}
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Bulan Awal</span>
               <Select value={start} onValueChange={setStart}>
-                <SelectTrigger className="w-[170px]">
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Pilih bulan awal" />
                 </SelectTrigger>
                 <SelectContent>
@@ -134,15 +184,11 @@ export function DashboardHeaderAndCards() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Separator */}
             <div className="pb-2 text-sm text-muted-foreground">s.d.</div>
-
-            {/* Bulan Akhir */}
             <div className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Bulan Akhir</span>
               <Select value={end} onValueChange={setEnd}>
-                <SelectTrigger className="w-[170px]">
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Pilih bulan akhir" />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,7 +202,7 @@ export function DashboardHeaderAndCards() {
             </div>
           </div>
 
-          {/* WITEL MULTI */}
+          {/* Filter witel */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -164,11 +210,14 @@ export function DashboardHeaderAndCards() {
                 className="w-[200px] justify-between"
                 disabled={isLoading}
               >
-                {labelWitel(selectedWitels, witels)}
+                {isAllWitels
+                  ? "Semua Witel"
+                  : selectedWitels.length === 1
+                  ? selectedWitels[0]
+                  : `${selectedWitels.length} Witel dipilih`}
                 <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </PopoverTrigger>
-
             <PopoverContent className="w-[250px] p-0">
               <Command>
                 <CommandInput placeholder="Cari witel..." />
@@ -179,14 +228,11 @@ export function DashboardHeaderAndCards() {
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          selectedWitels.length === witels.length
-                            ? "opacity-100"
-                            : "opacity-0"
+                          isAllWitels ? "opacity-100" : "opacity-0"
                         )}
                       />
                       Semua Witel
                     </CommandItem>
-
                     {witels.map((w) => {
                       const checked = selectedWitels.includes(w);
                       return (
@@ -208,10 +254,8 @@ export function DashboardHeaderAndCards() {
           </Popover>
         </div>
       </div>
-
       {/* KPI Cards */}
       <SectionCards start={start} end={end} witel={witelParam} />
-
       {/* Charts: Top AR (1/3) + Produktivitas (2/3) */}
       <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-stretch">
         <div className="w-full lg:w-1/3">
@@ -221,6 +265,8 @@ export function DashboardHeaderAndCards() {
           <ProductivityChart start={start} end={end} witel={witelParam} />
         </div>
       </div>
+      {/* Last sync */}
+      
     </div>
   );
 }

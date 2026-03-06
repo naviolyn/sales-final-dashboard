@@ -1,24 +1,57 @@
+import { RefreshCw } from "lucide-react";
+
 import data from "./_components/data.json";
 import { DataTable } from "./_components/data-table";
-import TopARCard from "./_components/top-ar";
 import { ChartSalesByWitel } from "./_components/chart-sales-by-witel";
-
-// ⬇️ PERBAIKI PATH INI
 import { DashboardHeaderAndCards } from "../_components/dashboard-header-and-cards";
 
-export default function Page() {
+async function getLastSync(): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${
+        process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"
+      }/api/summary/meta`,
+      { next: { revalidate: 60 } }
+    );
+    const json = await res.json();
+    return json?.lastSync ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function formatSyncTime(isoString?: string | null) {
+  if (!isoString) return null;
+  return new Date(isoString).toLocaleString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default async function Page() {
+  const lastSync = await getLastSync();
+  const syncLabel = formatSyncTime(lastSync);
+
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-4">
       <DashboardHeaderAndCards />
       <ChartSalesByWitel />
-      <div className="flex flex-row max-lg:flex-col gap-4 md:gap-6 ">
-        {/* <div className="xl:w-3/5">
-          <TopARCard />
-        </div> */}
-        {/* <div className="xl:w-2/5">yey</div> */}
-      </div>
 
       <DataTable data={data} />
+
+      {/* Last sync */}
+      {syncLabel && (
+        <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground pb-2">
+          <RefreshCw className="size-3" />
+          <span>
+            Data terakhir diperbarui:{" "}
+            <span className="font-medium">{syncLabel}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
