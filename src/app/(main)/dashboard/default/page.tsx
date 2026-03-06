@@ -39,7 +39,7 @@ export default async function Page() {
     <div className="@container/main flex flex-col gap-6 pb-6">
       <DashboardHeaderAndCards />
       <ChartSalesByWitel />
-      <DataTable data={data} />
+      
 
       {/* Last sync */}
       {syncLabel && (
