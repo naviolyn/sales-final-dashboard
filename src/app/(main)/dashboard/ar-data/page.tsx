@@ -10,6 +10,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  SlidersHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -44,16 +49,21 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { getWitelColor } from "@/lib/witel-colors";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 type SortKey =
   | "namaAr"
   | "witel"
   | "telda"
   | "kodeSales"
+  | "noHp"
+  | "email"
   | "sales"
   | "poi"
-  | "coll";
+  | "coll"
+  | "underperform";
 
 function fmtNumber(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
@@ -87,7 +97,6 @@ function SortIcon({
   );
 }
 
-// ── Multi-select ──────────────────────────────────────────────────────────────
 function MultiSelect({
   label,
   options,
@@ -100,11 +109,9 @@ function MultiSelect({
   onChange: (v: string[]) => void;
 }) {
   const [search, setSearch] = React.useState("");
-
   const filtered = options.filter((o) =>
     o.toLowerCase().includes(search.toLowerCase())
   );
-
   function toggle(val: string) {
     onChange(
       selected.includes(val)
@@ -112,14 +119,12 @@ function MultiSelect({
         : [...selected, val]
     );
   }
-
   const displayLabel =
     selected.length === 0
       ? `Semua ${label}`
       : selected.length === 1
       ? selected[0]
       : `${selected.length} ${label} dipilih`;
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -135,7 +140,7 @@ function MultiSelect({
         className="w-[260px] p-0"
         align="start"
         sideOffset={4}
-        avoidCollisions={true}
+        avoidCollisions
         collisionPadding={16}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -211,26 +216,22 @@ function MultiSelect({
   );
 }
 
-// ── Warna witel ───────────────────────────────────────────────────────────────
-const PALETTE = [
-  "#2563eb",
-  "#16a34a",
-  "#dc2626",
-  "#d97706",
-  "#7c3aed",
-  "#0891b2",
-];
+const ALL_COLUMNS = [
+  { key: "no", label: "#" },
+  { key: "kodeSales", label: "Kode Sales" },
+  { key: "namaAr", label: "Nama AR" },
+  { key: "noHp", label: "No HP" },
+  { key: "email", label: "Email" },
+  { key: "witel", label: "Witel" },
+  { key: "telda", label: "Telda" },
+  { key: "sales", label: "Sales" },
+  { key: "poi", label: "POI" },
+  { key: "coll", label: "Collection" },
+  { key: "underperform", label: "Status" },
+] as const;
 
-function useWitelColors(witels: string[]) {
-  return React.useMemo(() => {
-    const sorted = [...witels].sort((a, b) => a.localeCompare(b));
-    const map = new Map<string, string>();
-    sorted.forEach((w, i) => map.set(w, PALETTE[i % PALETTE.length]));
-    return map;
-  }, [witels]);
-}
+type ColumnKey = (typeof ALL_COLUMNS)[number]["key"];
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default function ARDataPage() {
   const { data: meta } = useSWR("/api/summary/meta", fetcher);
   const months: string[] = meta?.months ?? [];
@@ -245,7 +246,24 @@ export default function ARDataPage() {
   const [sortBy, setSortBy] = React.useState<SortKey>("sales");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
   const [page, setPage] = React.useState(1);
+  const [underperformFilter, setUnderperformFilter] = React.useState<
+    "all" | "underperform" | "ok"
+  >("all");
   const pageSize = 50;
+
+  const [visibleCols, setVisibleCols] = React.useState<Set<ColumnKey>>(
+    new Set(ALL_COLUMNS.map((c) => c.key))
+  );
+
+  function toggleCol(key: ColumnKey) {
+    setVisibleCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else next.add(key);
+      return next;
+    });
+  }
 
   React.useEffect(() => {
     if (defaultMonth && !start) {
@@ -253,10 +271,18 @@ export default function ARDataPage() {
       setEnd(defaultMonth);
     }
   }, [defaultMonth]);
-
   React.useEffect(() => {
     setPage(1);
-  }, [start, end, selectedWitels, selectedTeldas, kodeSales, sortBy, sortDir]);
+  }, [
+    start,
+    end,
+    selectedWitels,
+    selectedTeldas,
+    kodeSales,
+    sortBy,
+    sortDir,
+    underperformFilter,
+  ]);
   React.useEffect(() => {
     setSelectedTeldas([]);
   }, [selectedWitels]);
@@ -272,6 +298,7 @@ export default function ARDataPage() {
     p.set("sortDir", sortDir);
     p.set("page", String(page));
     p.set("pageSize", String(pageSize));
+    if (underperformFilter !== "all") p.set("underperform", underperformFilter);
     return p.toString();
   }, [
     start,
@@ -282,6 +309,7 @@ export default function ARDataPage() {
     sortBy,
     sortDir,
     page,
+    underperformFilter,
   ]);
 
   const { data, isLoading } = useSWR(
@@ -295,11 +323,11 @@ export default function ARDataPage() {
   const totalPages = Math.ceil(total / pageSize);
   const availableWitels: string[] = data?.witels ?? [];
   const availableTeldas: string[] = data?.teldas ?? [];
-  const witelColors = useWitelColors(availableWitels);
-  const getColor = (w: string) => witelColors.get(w) ?? "#888";
-
   const hasFilters =
-    selectedWitels.length > 0 || selectedTeldas.length > 0 || kodeSales;
+    selectedWitels.length > 0 ||
+    selectedTeldas.length > 0 ||
+    kodeSales ||
+    underperformFilter !== "all";
 
   function handleSort(col: SortKey) {
     if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -309,42 +337,29 @@ export default function ARDataPage() {
     }
   }
 
-  const SortTh = ({
-    col,
-    children,
-    className,
-  }: {
-    col: SortKey;
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <TableHead
-      className={cn("cursor-pointer select-none whitespace-nowrap", className)}
-      onClick={() => handleSort(col)}
-    >
-      <div className="flex items-center gap-1">
-        {children}
-        <SortIcon column={col} sortBy={sortBy} sortDir={sortDir} />
-      </div>
-    </TableHead>
-  );
+  const showCol = (key: ColumnKey) => visibleCols.has(key);
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      {/* ── FILTER CARD ── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Data AR</CardTitle>
-          <CardDescription>
-            Tabel data Account Representative dengan filter periode, witel,
-            telda, dan kode sales.
-          </CardDescription>
-        </CardHeader>
+    <div
+      className="flex flex-col gap-3 p-4"
+      style={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}
+    >
+      <div>
+        <h1 className="text-xl font-semibold">Data AR</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Tabel data Account Representative — kontak, performa, dan status
+          underperform
+          <span className="italic">
+            (sales lebih kecil dari 3 selama tiga bulan terakhir)
+          </span>
+          .
+        </p>
+      </div>
 
-        <CardContent className="flex flex-col gap-3">
-          {/* Satu baris filter */}
+      {/* FILTER CARD */}
+      <Card className="w-full overflow-hidden py-4 gap-2">
+        <CardContent className="flex flex-col gap-3 px-4 pb-4">
           <div className="flex flex-wrap items-end gap-3">
-            {/* Bulan Awal */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 Bulan Awal
@@ -368,10 +383,7 @@ export default function ARDataPage() {
                 </SelectContent>
               </Select>
             </div>
-
             <span className="pb-1.5 text-sm text-muted-foreground">s.d.</span>
-
-            {/* Bulan Akhir */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 Bulan Akhir
@@ -380,7 +392,6 @@ export default function ARDataPage() {
                 value={end}
                 onValueChange={(v) => {
                   setEnd(v);
-                  // kalau start > end baru, sesuaikan start
                   if (start && v < start) setStart(v);
                 }}
               >
@@ -400,11 +411,7 @@ export default function ARDataPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Divider */}
             <div className="h-9 w-px bg-border" />
-
-            {/* Witel */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 Witel
@@ -416,8 +423,6 @@ export default function ARDataPage() {
                 onChange={setSelectedWitels}
               />
             </div>
-
-            {/* Telda */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 Telda
@@ -429,11 +434,7 @@ export default function ARDataPage() {
                 onChange={setSelectedTeldas}
               />
             </div>
-
-            {/* Divider */}
             <div className="h-9 w-px bg-border" />
-
-            {/* Kode Sales / Nama AR */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 Kode / Nama AR
@@ -471,8 +472,35 @@ export default function ARDataPage() {
                 </Button>
               </div>
             </div>
-
-            {/* Reset */}
+            <div className="h-9 w-px bg-border" />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Status
+              </label>
+              <Select
+                value={underperformFilter}
+                onValueChange={(v) => setUnderperformFilter(v as any)}
+              >
+                <SelectTrigger className="h-9 w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="underperform">
+                    <span className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-rose-500" />
+                      Underperform
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="ok">
+                    <span className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-emerald-500" />
+                      Good
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {hasFilters && (
               <Button
                 variant="ghost"
@@ -483,6 +511,7 @@ export default function ARDataPage() {
                   setSelectedTeldas([]);
                   setKodeSalesInput("");
                   setKodeSales("");
+                  setUnderperformFilter("all");
                 }}
               >
                 <X className="size-3.5 mr-1" />
@@ -502,7 +531,7 @@ export default function ARDataPage() {
                 >
                   <span
                     className="size-2 rounded-full shrink-0"
-                    style={{ backgroundColor: getColor(w) }}
+                    style={{ backgroundColor: getWitelColor(w) }}
                   />
                   {w}
                   <button
@@ -537,34 +566,149 @@ export default function ARDataPage() {
         </CardContent>
       </Card>
 
-      {/* ── TABLE CARD ── */}
-      <Card>
+      {/* TABLE CARD */}
+      <Card className="w-full overflow-hidden py-4">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="max-w-full min-w-[400px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">#</TableHead>
-                  <SortTh col="kodeSales">Kode Sales</SortTh>
-                  <SortTh col="namaAr">Nama AR</SortTh>
-                  <SortTh col="witel">Witel</SortTh>
-                  <SortTh col="telda">Telda</SortTh>
-                  <SortTh col="sales" className="text-right">
-                    Sales
-                  </SortTh>
-                  <SortTh col="poi" className="text-right">
-                    POI
-                  </SortTh>
-                  <SortTh col="coll" className="text-right">
-                    Collection
-                  </SortTh>
+                  {showCol("no") && (
+                    <TableHead className="w-12 text-center">#</TableHead>
+                  )}
+                  {showCol("kodeSales") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => handleSort("kodeSales")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Kode Sales{" "}
+                        <SortIcon
+                          column="kodeSales"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("namaAr") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => handleSort("namaAr")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Nama AR{" "}
+                        <SortIcon
+                          column="namaAr"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("noHp") && (
+                    <TableHead className="whitespace-nowrap">No HP</TableHead>
+                  )}
+                  {showCol("email") && (
+                    <TableHead className="whitespace-nowrap">Email</TableHead>
+                  )}
+                  {showCol("witel") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => handleSort("witel")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Witel{" "}
+                        <SortIcon
+                          column="witel"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("telda") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => handleSort("telda")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Telda{" "}
+                        <SortIcon
+                          column="telda"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("sales") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap text-right"
+                      onClick={() => handleSort("sales")}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        Sales{" "}
+                        <SortIcon
+                          column="sales"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("poi") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap text-right"
+                      onClick={() => handleSort("poi")}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        POI{" "}
+                        <SortIcon
+                          column="poi"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("coll") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap text-right"
+                      onClick={() => handleSort("coll")}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        Collection{" "}
+                        <SortIcon
+                          column="coll"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {showCol("underperform") && (
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => handleSort("underperform")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Status{" "}
+                        <SortIcon
+                          column="underperform"
+                          sortBy={sortBy}
+                          sortDir={sortDir}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: visibleCols.size }).map((_, j) => (
                         <TableCell key={j}>
                           <div className="h-4 rounded bg-muted animate-pulse" />
                         </TableCell>
@@ -574,50 +718,107 @@ export default function ARDataPage() {
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={visibleCols.size}
                       className="py-16 text-center text-muted-foreground"
                     >
                       Tidak ada data untuk filter yang dipilih.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  items.map((row: any, idx: number) => (
-                    <TableRow key={`${row.kodeSales}-${idx}`}>
-                      <TableCell className="text-center text-sm text-muted-foreground">
-                        {(page - 1) * pageSize + idx + 1}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {row.kodeSales || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {row.namaAr}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className="gap-1.5 font-normal"
-                        >
-                          <span
-                            className="size-2 rounded-full shrink-0"
-                            style={{ backgroundColor: getColor(row.witel) }}
-                          />
-                          {row.witel}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {row.telda || "-"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {fmtNumber(row.sales)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {fmtNumber(row.poi)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {fmtNumber(row.coll)}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  items.map((row: any, idx: number) => {
+                    const witelColor = getWitelColor(row.witel);
+                    const isUnderperform = row.underperform === true;
+                    return (
+                      <TableRow
+                        key={`${row.kodeSales}-${idx}`}
+                        className={cn(
+                          isUnderperform &&
+                            "bg-rose-100/60 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-950/30"
+                        )}
+                      >
+                        {showCol("no") && (
+                          <TableCell className="text-center text-sm text-muted-foreground">
+                            {(page - 1) * pageSize + idx + 1}
+                          </TableCell>
+                        )}
+                        {showCol("kodeSales") && (
+                          <TableCell className="font-mono text-sm">
+                            {row.kodeSales || "-"}
+                          </TableCell>
+                        )}
+                        {showCol("namaAr") && (
+                          <TableCell className="font-medium">
+                            {row.namaAr}
+                          </TableCell>
+                        )}
+                        {showCol("noHp") && (
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {row.noHp || "-"}
+                          </TableCell>
+                        )}
+                        {showCol("email") && (
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            <span title={row.email}>{row.email || "-"}</span>
+                          </TableCell>
+                        )}
+                        {showCol("witel") && (
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="gap-1.5 font-normal"
+                            >
+                              <span
+                                className="size-2 rounded-full shrink-0"
+                                style={{ backgroundColor: witelColor }}
+                              />
+                              {row.witel}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {showCol("telda") && (
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.telda || "-"}
+                          </TableCell>
+                        )}
+                        {showCol("sales") && (
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {fmtNumber(row.sales)}
+                          </TableCell>
+                        )}
+                        {showCol("poi") && (
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {fmtNumber(row.poi)}
+                          </TableCell>
+                        )}
+                        {showCol("coll") && (
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {fmtNumber(row.coll)}
+                          </TableCell>
+                        )}
+                        {showCol("underperform") && (
+                          <TableCell>
+                            {isUnderperform ? (
+                              <Badge
+                                variant="outline"
+                                className="gap-1 border-rose-400 bg-rose-100 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-400"
+                              >
+                                <AlertTriangle className="size-3" />
+                                Underperform
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="gap-1 border-emerald-400 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400"
+                              >
+                                <span className="size-1.5 rounded-full bg-emerald-500" />
+                                Good
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

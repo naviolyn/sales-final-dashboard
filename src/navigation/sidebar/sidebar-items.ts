@@ -64,6 +64,11 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/ar-data",
         icon: Table, // import Table from lucide-react
       },
+      {
+        title: "Data Telda",
+        url: "/dashboard/ar-telda",
+        icon: Table, // import Table from lucide-react
+      },
       // {
       //   title: "Finance",
       //   url: "/dashboard/finance",
